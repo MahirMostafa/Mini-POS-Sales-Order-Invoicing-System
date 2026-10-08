@@ -21,6 +21,8 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $user = auth()->user();
+
         $filters = [
             'status' => $request->get('status'),
             'payment_status' => $request->get('payment_status'),
@@ -29,6 +31,11 @@ class OrderController extends Controller
             'start_date' => $request->get('start_date'),
             'end_date' => $request->get('end_date'),
         ];
+
+        // Non-admin roles only see their own sales orders
+        if ($user && !$user->hasRole('Admin')) {
+            $filters['user_id'] = $user->id;
+        }
 
         $orders = $this->orderRepo->paginate($request->integer('per_page', 15), $filters);
 
@@ -43,6 +50,14 @@ class OrderController extends Controller
         $order = $this->orderRepo->findById($id);
         if (!$order) {
             return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        $user = auth()->user();
+        if ($user && !$user->hasRole('Admin') && $order->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You can only view your own sales orders.',
+            ], 403);
         }
 
         $stockCheck = $order->isPending() 

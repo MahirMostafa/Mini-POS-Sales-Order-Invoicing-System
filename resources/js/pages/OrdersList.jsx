@@ -12,11 +12,16 @@ import {
   Calendar,
   AlertCircle,
   RefreshCw,
-  ShoppingBag
+  ShoppingBag,
+  UserCheck
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
 export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
+  const { user, role } = useAuth();
+  const isAdmin = role === 'Admin' || user?.roles?.[0]?.name === 'Admin';
+
   const [orders, setOrders] = useState([]);
   const [pagination, setPagination] = useState({});
   const [loading, setLoading] = useState(true);
@@ -131,11 +136,17 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
         <div>
           <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
             <Receipt className="w-4 h-4" />
-            <span>Order Fulfillment Lifecycle</span>
+            <span>{isAdmin ? 'Company Sales Orders Registry' : 'My Personal Sales Orders'}</span>
           </div>
-          <h2 className="text-xl font-black text-slate-900">Sales Orders Registry</h2>
+          <h2 className="text-xl font-black text-slate-900">
+            {isAdmin ? 'All Sales Orders' : `Sales Orders for ${user?.name || 'Current User'}`}
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Transition orders from <span className="text-amber-600 font-bold">Pending</span> to <span className="text-emerald-600 font-bold">Completed</span>, validate stock availability, and issue invoices.
+            {isAdmin ? (
+              <span>Administrator View: Displaying all sales orders processed across all staff & terminals.</span>
+            ) : (
+              <span>Staff View: Displaying only the sales orders created by you (<span className="font-bold text-slate-700">{user?.name}</span>).</span>
+            )}
           </p>
         </div>
 
@@ -193,6 +204,7 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-6">Order #</th>
                 <th className="py-3.5 px-6">Customer</th>
+                {isAdmin && <th className="py-3.5 px-6">Cashier / Staff</th>}
                 <th className="py-3.5 px-6">Date</th>
                 <th className="py-3.5 px-6">Items</th>
                 <th className="py-3.5 px-6 text-right">Grand Total</th>
@@ -203,14 +215,14 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-400">
+                  <td colSpan={isAdmin ? '8' : '7'} className="py-12 text-center text-slate-400">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-500" />
                     Loading orders...
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-slate-400">
+                  <td colSpan={isAdmin ? '8' : '7'} className="py-12 text-center text-slate-400">
                     No sales orders found matching criteria.
                   </td>
                 </tr>
@@ -229,7 +241,15 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                         <div className="font-bold text-slate-900">{order.customer?.name || 'Walk-in'}</div>
                         <div className="text-[10px] text-slate-400">{order.customer?.phone || 'No phone'}</div>
                       </td>
-                      <td className="py-4 px-6 text-slate-600">
+                      {isAdmin && (
+                        <td className="py-4 px-6">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                            <UserCheck className="w-3 h-3 text-indigo-600" />
+                            <span>{order.user?.name || 'Staff'}</span>
+                          </span>
+                        </td>
+                      )}
+                      <td className="py-4 px-6 text-slate-600 font-medium">
                         {order.order_date}
                       </td>
                       <td className="py-4 px-6 text-slate-700 font-medium">
