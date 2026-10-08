@@ -52,6 +52,17 @@ function ProtectedRoute({ children, allowedRoles = [], requiredPermissions = [] 
 function DashboardLayout() {
   const { user, role, loading } = useAuth();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -74,17 +85,25 @@ function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex selection:bg-indigo-500 selection:text-white">
-      {/* Left Modern Sidebar */}
+      {/* Left Modern Collapsible Sidebar */}
       <Sidebar
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapse={toggleSidebarCollapse}
       />
 
       {/* Main Content Layout */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-72">
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
+          isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'
+        }`}
+      >
         {/* Top Header */}
         <Header
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapse}
         />
 
         {/* Dynamic Page Views with Protected Spatie Routes */}
@@ -237,8 +256,7 @@ function DashboardLayout() {
 
         {/* System Footer */}
         <footer className="no-print py-4 px-6 border-t border-slate-200 bg-white text-center sm:text-left text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Mini POS & Sales Order Invoicing System • Clean Architecture & Spatie RBAC</span>
-          <span className="font-semibold text-slate-500">Status: Active Database & Queue Worker</span>
+          <span>Mini POS & Sales Order Invoicing System •</span>
         </footer>
       </div>
     </div>

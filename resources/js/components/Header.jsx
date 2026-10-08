@@ -1,9 +1,13 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Menu, UserCheck, ShieldCheck, Calculator } from 'lucide-react';
+import { Menu, UserCheck, ShieldCheck, Calculator, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
-export default function Header({ onToggleMobileSidebar }) {
+export default function Header({
+  onToggleMobileSidebar,
+  isSidebarCollapsed = false,
+  onToggleCollapse
+}) {
   const { user, role } = useAuth();
   const location = useLocation();
 
@@ -28,14 +32,30 @@ export default function Header({ onToggleMobileSidebar }) {
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-      {/* Left: Mobile Toggle & Page Title */}
+      {/* Left: Mobile Toggle / Desktop Collapse Toggle & Page Title */}
       <div className="flex items-center gap-3">
+        {/* Mobile menu button */}
         <button
           type="button"
           onClick={onToggleMobileSidebar}
           className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 lg:hidden"
+          title="Open Mobile Navigation"
         >
           <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Desktop sidebar toggle button */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="hidden lg:flex p-2 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
+          title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {isSidebarCollapsed ? (
+            <PanelLeftOpen className="w-5 h-5" />
+          ) : (
+            <PanelLeftClose className="w-5 h-5" />
+          )}
         </button>
 
         <div>
