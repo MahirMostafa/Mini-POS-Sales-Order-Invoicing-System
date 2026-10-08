@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   UserCheck,
   Calculator,
-  Shield
+  Shield,
+  X
 } from 'lucide-react';
 
 export default function RolePermissionManagement() {
