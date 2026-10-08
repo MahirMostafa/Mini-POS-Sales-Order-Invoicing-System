@@ -12,14 +12,19 @@ import {
   RefreshCw,
   PlusCircle,
   Trash2,
+  Edit2,
   X,
   Boxes,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 export default function ProductCatalog() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0, per_page: 10 });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -31,14 +36,16 @@ export default function ProductCatalog() {
   const [stockNote, setStockNote] = useState('');
   const [replenishing, setReplenishing] = useState(false);
 
-  // Add Product Modal
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [creatingProduct, setCreatingProduct] = useState(false);
+  // Add / Edit Product Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [productForm, setProductForm] = useState({
     name: '',
     category_id: '',
     brand: '',
     description: '',
+    is_active: true,
     variants: [
       {
         variant_name: 'Standard',
@@ -54,10 +61,10 @@ export default function ProductCatalog() {
 
   const currency = '৳';
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1) => {
     setLoading(true);
     try {
-      let url = `/products?search=${encodeURIComponent(searchQuery)}`;
+      let url = `/products?page=${page}&per_page=${pagination.per_page || 10}&search=${encodeURIComponent(searchQuery)}`;
       if (selectedCategory) {
         url += `&category_id=${selectedCategory}`;
       }
@@ -65,6 +72,14 @@ export default function ProductCatalog() {
       if (res.data.success) {
         setProducts(res.data.products?.data || res.data.products || []);
         setCategories(res.data.categories || []);
+        if (res.data.products?.current_page) {
+          setPagination({
+            current_page: res.data.products.current_page,
+            last_page: res.data.products.last_page,
+            total: res.data.products.total,
+            per_page: res.data.products.per_page,
+          });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -79,8 +94,53 @@ export default function ProductCatalog() {
   };
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, [selectedCategory]);
+
+  const handleOpenAddModal = () => {
+    setEditingProduct(null);
+    setProductForm({
+      name: '',
+      category_id: categories[0]?.id || '',
+      brand: '',
+      description: '',
+      is_active: true,
+      variants: [
+        {
+          variant_name: 'Standard',
+          sku: `SKU-${Date.now().toString().slice(-4)}`,
+          barcode: '',
+          cost_price: 0,
+          selling_price: 0,
+          stock_quantity: 10,
+          alert_quantity: 5
+        }
+      ]
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (product) => {
+    setEditingProduct(product);
+    setProductForm({
+      name: product.name,
+      category_id: product.category_id || '',
+      brand: product.brand || '',
+      description: product.description || '',
+      is_active: product.is_active ?? true,
+      variants: product.variants?.map((v) => ({
+        id: v.id,
+        variant_name: v.variant_name,
+        sku: v.sku,
+        barcode: v.barcode || '',
+        cost_price: parseFloat(v.cost_price || 0),
+        selling_price: parseFloat(v.selling_price || 0),
+        stock_quantity: v.stock_quantity,
+        alert_quantity: v.alert_quantity || 5
+      })) || []
+    });
+    setIsModalOpen(true);
+  };
 
   const handleAddVariantRow = () => {
     setProductForm({
@@ -89,7 +149,7 @@ export default function ProductCatalog() {
         ...productForm.variants,
         {
           variant_name: '',
-          sku: '',
+          sku: `SKU-${Date.now().toString().slice(-4)}`,
           barcode: '',
           cost_price: 0,
           selling_price: 0,
@@ -112,45 +172,75 @@ export default function ProductCatalog() {
     setProductForm({ ...productForm, variants: newVariants });
   };
 
-  const handleCreateProduct = async (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
-    setCreatingProduct(true);
+    setSubmitting(true);
     try {
-      const res = await api.post('/products', productForm);
-      Swal.fire({
-        icon: 'success',
-        title: 'Product Created',
-        text: `"${productForm.name}" with ${productForm.variants.length} variant(s) created.`,
-        timer: 1500,
-        showConfirmButton: false
-      });
-      setIsAddModalOpen(false);
-      setProductForm({
-        name: '',
-        category_id: '',
-        brand: '',
-        description: '',
-        variants: [
-          {
-            variant_name: 'Standard',
-            sku: '',
-            barcode: '',
-            cost_price: 0,
-            selling_price: 0,
-            stock_quantity: 10,
-            alert_quantity: 5
-          }
-        ]
-      });
-      fetchProducts();
+      if (editingProduct) {
+        // Update existing product
+        await api.put(`/products/${editingProduct.id}`, productForm);
+        Swal.fire({
+          icon: 'success',
+          title: 'Product Updated',
+          text: `Product "${productForm.name}" updated successfully.`,
+          timer: 1500,
+          showConfirmButton: false
+        });
+      } else {
+        // Create new product
+        await api.post('/products', productForm);
+        Swal.fire({
+          icon: 'success',
+          title: 'Product Created',
+          text: `"${productForm.name}" with ${productForm.variants.length} variant(s) created.`,
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+      setIsModalOpen(false);
+      fetchProducts(pagination.current_page || 1);
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'Creation Failed',
+        title: 'Operation Failed',
         text: err.response?.data?.message || 'Could not save product.'
       });
     } finally {
-      setCreatingProduct(false);
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product) => {
+    const result = await Swal.fire({
+      title: 'Delete Product?',
+      text: `Are you sure you want to delete "${product.name}"? Products with sales or purchase history cannot be deleted.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, delete product'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await api.delete(`/products/${product.id}`);
+        if (res.data.success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Deleted',
+            text: res.data.message || 'Product deleted successfully.',
+            timer: 1500,
+            showConfirmButton: false
+          });
+          fetchProducts(pagination.current_page || 1);
+        }
+      } catch (err) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Deletion Blocked',
+          text: err.response?.data?.message || 'Cannot delete product with existing sales or purchase records.'
+        });
+      }
     }
   };
 
@@ -179,7 +269,7 @@ export default function ProductCatalog() {
         setStockQty('');
         setPurchaseCost('');
         setStockNote('');
-        fetchProducts();
+        fetchProducts(pagination.current_page || 1);
       }
     } catch (err) {
       Swal.fire({
@@ -209,7 +299,7 @@ export default function ProductCatalog() {
 
         <button
           type="button"
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleOpenAddModal}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
         >
           <Plus className="w-4 h-4" />
@@ -256,7 +346,7 @@ export default function ProductCatalog() {
             placeholder="Search products, SKU, barcode..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchProducts()}
+            onKeyDown={(e) => e.key === 'Enter' && fetchProducts(1)}
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
           />
         </div>
@@ -286,14 +376,41 @@ export default function ProductCatalog() {
                     {product.brand && (
                       <span className="text-xs text-indigo-600 font-bold">({product.brand})</span>
                     )}
+                    {!product.is_active && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                        Inactive
+                      </span>
+                    )}
                   </div>
                   {product.description && (
                     <p className="text-xs text-slate-500 mt-1">{product.description}</p>
                   )}
                 </div>
 
-                <div className="text-xs font-semibold text-slate-400">
-                  {product.variants?.length || 0} Variant(s) Available
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <span className="text-xs font-semibold text-slate-400 mr-2">
+                    {product.variants?.length || 0} Variant(s)
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(product)}
+                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1 text-xs font-bold"
+                    title="Edit Product and Variants"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProduct(product)}
+                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors inline-flex items-center gap-1 text-xs font-bold"
+                    title="Delete Product"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
 
@@ -365,8 +482,44 @@ export default function ProductCatalog() {
         )}
       </div>
 
-      {/* Add New Product & Variants Modal */}
-      {isAddModalOpen && (
+      {/* Pagination Bar */}
+      {pagination.total > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <span className="text-slate-500 font-medium">
+            Showing <span className="font-bold text-slate-900">{products.length}</span> of{' '}
+            <span className="font-bold text-slate-900">{pagination.total}</span> total products
+          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={pagination.current_page <= 1}
+              onClick={() => fetchProducts(pagination.current_page - 1)}
+              className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              title="Previous Page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            <span className="px-3 py-1 font-bold text-slate-800">
+              Page {pagination.current_page} of {pagination.last_page}
+            </span>
+
+            <button
+              type="button"
+              disabled={pagination.current_page >= pagination.last_page}
+              onClick={() => fetchProducts(pagination.current_page + 1)}
+              className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              title="Next Page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Product & Variants Modal */}
+      {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
@@ -376,13 +529,15 @@ export default function ProductCatalog() {
                   <Package className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Add New Product & Variants</h3>
-                  <p className="text-[10px] text-slate-400">Specify multi-variant pricing, SKU, and initial stock</p>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    {editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Product & Variants'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400">Specify multi-variant pricing, SKU, and stock</p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => setIsModalOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 <X className="w-4 h-4" />
@@ -390,7 +545,7 @@ export default function ProductCatalog() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCreateProduct} className="p-6 space-y-6">
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold text-slate-700 mb-1">Product Name *</label>
@@ -549,17 +704,17 @@ export default function ProductCatalog() {
               <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={creatingProduct}
+                  disabled={submitting}
                   className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-50"
                 >
-                  {creatingProduct ? 'Saving Product...' : 'Create Product with Variants'}
+                  {submitting ? 'Saving Product...' : editingProduct ? 'Update Product' : 'Create Product with Variants'}
                 </button>
               </div>
             </form>

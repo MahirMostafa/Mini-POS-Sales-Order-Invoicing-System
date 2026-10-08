@@ -82,6 +82,9 @@ Route::prefix('purchases')->group(function () {
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::post('/', [ProductController::class, 'store']);
+    Route::get('/{id}', [ProductController::class, 'show']);
+    Route::put('/{id}', [ProductController::class, 'update']);
+    Route::delete('/{id}', [ProductController::class, 'destroy']);
     Route::post('/variants/{variantId}/stock', [ProductController::class, 'addStock']);
 });
 
