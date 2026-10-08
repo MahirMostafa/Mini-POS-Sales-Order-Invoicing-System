@@ -75,8 +75,8 @@ class PurchaseReceiptWorkflowTest extends TestCase
 
         $this->assertEquals($initialStock, $variant->fresh()->stock_quantity);
 
-        // Now receive goods via API endpoint
-        $response = $this->actingAs($receiver)->postJson("/api/purchases/{$purchase->id}/receive");
+        // Now receive goods via endpoint
+        $response = $this->actingAs($receiver)->postJson("/purchases/{$purchase->id}/receive");
 
         $response->assertStatus(200);
         $response->assertJson([

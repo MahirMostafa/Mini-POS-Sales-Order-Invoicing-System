@@ -2,7 +2,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '',
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
     'Accept': 'application/json',

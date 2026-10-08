@@ -185,7 +185,7 @@ class PosOrderAccountingWorkflowTest extends TestCase
 
         // 2. Test Settle Due Payment
         $this->actingAs($user);
-        $settleResponse = $this->postJson("/api/customers/{$customer->id}/settle-due", [
+        $settleResponse = $this->postJson("/customers/{$customer->id}/settle-due", [
             'amount' => 200.00,
             'payment_method' => 'cash',
             'note' => 'Partial cash settlement',
