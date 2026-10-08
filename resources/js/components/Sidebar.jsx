@@ -18,17 +18,11 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
-  const { user, role, logout } = useAuth();
+  const { user, role, logout, canAccessRoute } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   const userRole = role || user?.roles?.[0]?.name || 'Admin';
-
-  // Role based access helper
-  const canAccess = (allowedRoles) => {
-    if (userRole === 'Admin') return true;
-    return allowedRoles.includes(userRole);
-  };
 
   const navGroups = [
     {
@@ -39,6 +33,7 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           label: 'POS Counter',
           icon: ShoppingCart,
           roles: ['Admin', 'Cashier'],
+          permissions: ['view-pos'],
           badge: 'Live',
           badgeColor: 'bg-emerald-100 text-emerald-700'
         },
@@ -46,13 +41,15 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           path: '/orders',
           label: 'Sales Orders',
           icon: Receipt,
-          roles: ['Admin', 'Cashier', 'Accountant']
+          roles: ['Admin', 'Cashier', 'Accountant'],
+          permissions: ['create-order', 'complete-order', 'view-pos']
         },
         {
           path: '/invoices',
           label: 'Invoices & Receipts',
           icon: FileText,
-          roles: ['Admin', 'Cashier', 'Accountant']
+          roles: ['Admin', 'Cashier', 'Accountant'],
+          permissions: ['view-invoices', 'print-invoices']
         }
       ]
     },
@@ -63,13 +60,15 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           path: '/products',
           label: 'Manage Products',
           icon: Package,
-          roles: ['Admin', 'Cashier', 'Accountant']
+          roles: ['Admin'],
+          permissions: ['manage-products']
         },
         {
           path: '/purchases',
           label: 'Manage Purchases',
           icon: Truck,
-          roles: ['Admin', 'Accountant']
+          roles: ['Admin', 'Accountant'],
+          permissions: ['manage-purchases']
         }
       ]
     },
@@ -80,13 +79,15 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           path: '/accounting',
           label: 'Accounting Dashboard',
           icon: Calculator,
-          roles: ['Admin', 'Accountant']
+          roles: ['Admin', 'Accountant'],
+          permissions: ['view-accounting-dashboard', 'view-ledger', 'view-journal-entries']
         },
         {
           path: '/taxes',
           label: 'Tax Rates (VAT)',
           icon: Percent,
-          roles: ['Admin', 'Accountant']
+          roles: ['Admin', 'Accountant'],
+          permissions: ['manage-tax-rates']
         }
       ]
     },
@@ -97,19 +98,22 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           path: '/users',
           label: 'Manage Users',
           icon: Users,
-          roles: ['Admin']
+          roles: ['Admin'],
+          permissions: ['manage-users']
         },
         {
           path: '/roles',
           label: 'Role & Permissions',
           icon: ShieldCheck,
-          roles: ['Admin']
+          roles: ['Admin'],
+          permissions: ['manage-roles']
         },
         {
           path: '/audit',
           label: 'Audit Activity Logs',
           icon: Activity,
-          roles: ['Admin']
+          roles: ['Admin'],
+          permissions: ['view-audit-logs']
         }
       ]
     }
@@ -182,7 +186,9 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
         {/* Navigation Links */}
         <nav className="flex-1 px-4 py-2 space-y-5 overflow-y-auto">
           {navGroups.map((group) => {
-            const visibleItems = group.items.filter((item) => canAccess(item.roles));
+            const visibleItems = group.items.filter((item) =>
+              canAccessRoute(item.roles, item.permissions)
+            );
             if (visibleItems.length === 0) return null;
 
             return (

@@ -47,7 +47,8 @@ class AuthController extends Controller
                 'success' => true,
                 'message' => "Welcome back, {$user->name}!",
                 'user' => $user,
-                'role' => $user->roles->pluck('name')->first(),
+                'role' => $user->roles->pluck('name')->first() ?? 'Admin',
+                'permissions' => $user->getAllPermissions()->pluck('name'),
             ]);
         }
 
@@ -69,7 +70,8 @@ class AuthController extends Controller
             'success' => true,
             'message' => "Logged in as {$user->name} ({$user->roles->pluck('name')->first()})",
             'user' => $user,
-            'role' => $user->roles->pluck('name')->first(),
+            'role' => $user->roles->pluck('name')->first() ?? 'Admin',
+            'permissions' => $user->getAllPermissions()->pluck('name'),
         ]);
     }
 

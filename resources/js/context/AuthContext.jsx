@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState('Admin');
+  const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [demoUsers, setDemoUsers] = useState([]);
@@ -15,10 +15,12 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await api.get('/auth/me');
       setUser(res.data.user);
-      setRole(res.data.role || 'Admin');
+      setRole(res.data.role);
       setPermissions(res.data.permissions || []);
     } catch (err) {
       setUser(null);
+      setRole(null);
+      setPermissions([]);
     } finally {
       setLoading(false);
     }
@@ -43,14 +45,13 @@ export const AuthProvider = ({ children }) => {
       const res = await api.post('/auth/login', { email, password });
       setUser(res.data.user);
       setRole(res.data.role);
+      setPermissions(res.data.permissions || []);
       Swal.fire({
         icon: 'success',
         title: 'Logged in!',
         text: res.data.message,
         timer: 1500,
         showConfirmButton: false,
-        background: '#0f172a',
-        color: '#f8fafc',
       });
       return true;
     } catch (err) {
@@ -63,14 +64,13 @@ export const AuthProvider = ({ children }) => {
       const res = await api.post(`/auth/quick-login/${userId}`);
       setUser(res.data.user);
       setRole(res.data.role);
+      setPermissions(res.data.permissions || []);
       Swal.fire({
         icon: 'success',
         title: 'Switched User',
         text: res.data.message,
         timer: 1200,
         showConfirmButton: false,
-        background: '#0f172a',
-        color: '#f8fafc',
       });
       return true;
     } catch (err) {
@@ -83,9 +83,33 @@ export const AuthProvider = ({ children }) => {
       await api.post('/auth/logout');
       setUser(null);
       setRole(null);
+      setPermissions([]);
     } catch (err) {
       setUser(null);
+      setRole(null);
+      setPermissions([]);
     }
+  };
+
+  const hasPermission = (perm) => {
+    if (!user) return false;
+    if (role === 'Admin') return true;
+    if (Array.isArray(perm)) {
+      return perm.some((p) => permissions.includes(p));
+    }
+    return permissions.includes(perm);
+  };
+
+  const canAccessRoute = (allowedRoles = [], requiredPermissions = []) => {
+    if (!user) return false;
+    if (role === 'Admin') return true;
+    if (allowedRoles.length > 0 && allowedRoles.includes(role)) {
+      return true;
+    }
+    if (requiredPermissions.length > 0 && requiredPermissions.some((p) => permissions.includes(p))) {
+      return true;
+    }
+    return false;
   };
 
   return (
@@ -98,6 +122,8 @@ export const AuthProvider = ({ children }) => {
       login,
       quickLogin,
       logout,
+      hasPermission,
+      canAccessRoute,
       refreshUser: fetchUser
     }}>
       {children}
