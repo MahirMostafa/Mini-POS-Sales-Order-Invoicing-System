@@ -15,28 +15,19 @@ import {
   Eye,
   CheckCircle2,
   X,
-  PlusCircle,
-  Clock,
   Barcode,
-  ArrowUpDown,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Printer,
-  AlertCircle,
   ShoppingBag,
-  Tag,
-  Check,
   Hash,
   Sparkles,
-  Layers,
-  ArrowUpRight,
-  TrendingUp,
-  CreditCard,
+  Package,
   Phone,
-  User,
-  Package
+  CreditCard,
+  Store
 } from 'lucide-react';
+import { printDocument } from '../utils/printReceipt';
 
 export default function PurchaseManagement() {
   const [purchases, setPurchases] = useState([]);
@@ -45,6 +36,13 @@ export default function PurchaseManagement() {
   const [recentSuppliers, setRecentSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [variantsList, setVariantsList] = useState([]);
+  const [company, setCompany] = useState({
+    name: 'MINI POS & RETAIL HUB',
+    address: 'Dhaka, Bangladesh',
+    phone: '+880 1700-000000',
+    email: 'billing@minipos.com',
+    tax_bin: 'BIN-99201928'
+  });
   const [loading, setLoading] = useState(true);
 
   // Filters & Search
@@ -150,35 +148,45 @@ export default function PurchaseManagement() {
     }
   };
 
-  // Fetch Products & Variants for Dropdown
+  // Fetch Products & POS Info
   const fetchProductsCatalog = async () => {
     try {
-      const res = await api.get('/products?per_page=150');
-      const prods = res.data.products?.data || res.data.products || [];
-      setProducts(prods);
+      const [resProducts, resPosInit] = await Promise.allSettled([
+        api.get('/products?per_page=150'),
+        api.get('/pos/init')
+      ]);
 
-      const allVars = [];
-      prods.forEach((p) => {
-        if (p.variants && p.variants.length > 0) {
-          p.variants.forEach((v) => {
-            allVars.push({
-              id: v.id,
-              product_id: p.id,
-              productName: p.name,
-              categoryName: p.category?.name || 'Uncategorized',
-              brand: p.brand || '',
-              variantName: v.variant_name || 'Standard',
-              sku: v.sku || '',
-              barcode: v.barcode || '',
-              costPrice: parseFloat(v.cost_price || 0),
-              sellingPrice: parseFloat(v.selling_price || 0),
-              stock: v.stock_quantity || 0,
-              image: p.image_url || null,
+      if (resProducts.status === 'fulfilled') {
+        const prods = resProducts.value.data.products?.data || resProducts.value.data.products || [];
+        setProducts(prods);
+
+        const allVars = [];
+        prods.forEach((p) => {
+          if (p.variants && p.variants.length > 0) {
+            p.variants.forEach((v) => {
+              allVars.push({
+                id: v.id,
+                product_id: p.id,
+                productName: p.name,
+                categoryName: p.category?.name || 'Uncategorized',
+                brand: p.brand || '',
+                variantName: v.variant_name || 'Standard',
+                sku: v.sku || '',
+                barcode: v.barcode || '',
+                costPrice: parseFloat(v.cost_price || 0),
+                sellingPrice: parseFloat(v.selling_price || 0),
+                stock: v.stock_quantity || 0,
+                image: p.image_url || null,
+              });
             });
-          });
-        }
-      });
-      setVariantsList(allVars);
+          }
+        });
+        setVariantsList(allVars);
+      }
+
+      if (resPosInit.status === 'fulfilled' && resPosInit.value.data.company) {
+        setCompany(resPosInit.value.data.company);
+      }
     } catch (err) {
       console.error('Failed to load products catalog', err);
     }
@@ -232,12 +240,10 @@ export default function PurchaseManagement() {
       const existingIndex = prev.items.findIndex((item) => item.product_variant_id === variant.id);
 
       if (existingIndex > -1) {
-        // Increment quantity
         const updated = [...prev.items];
         updated[existingIndex].quantity += qty;
         return { ...prev, items: updated };
       } else {
-        // Add new line item
         const newLine = {
           product_variant_id: variant.id,
           variantDetails: variant,
@@ -249,11 +255,9 @@ export default function PurchaseManagement() {
       }
     });
 
-    // Visual feedback highlight
     setLastScannedVariantId(variant.id);
     setTimeout(() => setLastScannedVariantId(null), 1500);
 
-    // Reset searches
     setProductSearchQuery('');
     setShowProductDropdown(false);
   };
@@ -264,7 +268,6 @@ export default function PurchaseManagement() {
     const raw = barcodeInput.trim();
     if (!raw) return;
 
-    // Search exact match in barcode or SKU or case-insensitive
     const match = variantsList.find(
       (v) =>
         (v.barcode && v.barcode.toLowerCase() === raw.toLowerCase()) ||
@@ -275,7 +278,6 @@ export default function PurchaseManagement() {
       addVariantToPurchase(match, 1);
       setBarcodeInput('');
     } else {
-      // Try partial match or fallback
       const partial = variantsList.find(
         (v) =>
           v.productName.toLowerCase().includes(raw.toLowerCase()) ||
@@ -403,7 +405,7 @@ export default function PurchaseManagement() {
 
         setIsCreateOpen(false);
         fetchPurchases(1);
-        fetchProductsCatalog(); // Refresh current stock and costs
+        fetchProductsCatalog();
       }
     } catch (err) {
       console.error(err);
@@ -417,9 +419,10 @@ export default function PurchaseManagement() {
     }
   };
 
-  // Print GRN / Purchase Note
+  // Print GRN / Goods Received Note
   const handlePrintGRN = () => {
-    window.print();
+    if (!selectedPurchase) return;
+    printDocument('purchase-grn-document', `Goods Received Note - ${selectedPurchase.purchase_number}`);
   };
 
   return (
@@ -523,7 +526,7 @@ export default function PurchaseManagement() {
                 key={d.id}
                 type="button"
                 onClick={() => handleDateFilterChange(d.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
                   dateFilter === d.id
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -554,7 +557,7 @@ export default function PurchaseManagement() {
             <button
               type="button"
               onClick={() => fetchPurchases(currentPage)}
-              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-2xs transition-colors"
+              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-2xs transition-colors cursor-pointer"
               title="Refresh list"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -668,7 +671,7 @@ export default function PurchaseManagement() {
                       <button
                         type="button"
                         onClick={() => setSelectedPurchase(p)}
-                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1.5 text-xs font-bold"
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1.5 text-xs font-bold cursor-pointer"
                         title="View Goods Received Note"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -892,7 +895,7 @@ export default function PurchaseManagement() {
                       <button
                         type="button"
                         onClick={handleBarcodeSubmit}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-xs"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-xs cursor-pointer"
                       >
                         Scan
                       </button>
@@ -989,7 +992,7 @@ export default function PurchaseManagement() {
                     <button
                       type="button"
                       onClick={handleClearAllItems}
-                      className="text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:underline"
+                      className="text-[11px] font-bold text-rose-500 hover:text-rose-700 hover:underline cursor-pointer"
                     >
                       Clear All Items
                     </button>
@@ -1079,7 +1082,7 @@ export default function PurchaseManagement() {
                                   <button
                                     type="button"
                                     onClick={() => handleItemFieldChange(index, 'quantity', item.quantity - 1)}
-                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold"
+                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold cursor-pointer"
                                   >
                                     -
                                   </button>
@@ -1094,7 +1097,7 @@ export default function PurchaseManagement() {
                                   <button
                                     type="button"
                                     onClick={() => handleItemFieldChange(index, 'quantity', item.quantity + 1)}
-                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold"
+                                    className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold cursor-pointer"
                                   >
                                     +
                                   </button>
@@ -1123,7 +1126,7 @@ export default function PurchaseManagement() {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveLineItem(index)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                   title="Remove item"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -1153,7 +1156,7 @@ export default function PurchaseManagement() {
                   <button
                     type="button"
                     onClick={() => setIsCreateOpen(false)}
-                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                    className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1174,10 +1177,11 @@ export default function PurchaseManagement() {
 
       {/* VIEW GOODS RECEIVED NOTE (GRN) / PURCHASE MODAL */}
       {selectedPurchase && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            
+            {/* Modal Top Header (Sticky, No-Print) */}
+            <div className="no-print shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/95 backdrop-blur-xs">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
                   <Truck className="w-5 h-5" />
@@ -1193,99 +1197,180 @@ export default function PurchaseManagement() {
                 <button
                   type="button"
                   onClick={handlePrintGRN}
-                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-bold px-2.5"
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
                   title="Print Goods Received Note"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print</span>
+                  <span>Print GRN</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPurchase(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6 space-y-5">
-              {/* Meta Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Purchase Date</div>
-                  <div className="font-bold text-slate-800 mt-0.5">{selectedPurchase.purchase_date}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Stock Status</div>
-                  <div className="font-bold text-emerald-600 capitalize mt-0.5">
-                    {selectedPurchase.status} (In Stock)
+            {/* Scrollable Printable Document Container */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-slate-50/30">
+              <div id="purchase-grn-document" className="purchase-print-area space-y-6 bg-white text-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs">
+                {/* Store & Document Header */}
+                <div className="grn-header flex justify-between items-start border-b-2 border-indigo-600 pb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Store className="w-5 h-5 text-indigo-600 no-print" />
+                      <h2 className="company-title text-xl font-black uppercase tracking-tight text-slate-900">
+                        {company.name || 'MINI POS & RETAIL HUB'}
+                      </h2>
+                    </div>
+                    <p className="company-sub text-xs text-slate-500">{company.address || 'Dhaka, Bangladesh'}</p>
+                    <p className="company-sub text-xs text-slate-500">
+                      Tel: {company.phone || '+880 1700-000000'} | Email: {company.email || 'billing@minipos.com'}
+                    </p>
+                    <p className="company-sub text-xs font-bold text-indigo-600">VAT Reg BIN: {company.tax_bin || 'BIN-99201928'}</p>
+                  </div>
+
+                  <div className="doc-badge text-right">
+                    <h3 className="doc-title text-lg font-black text-indigo-600 uppercase">Goods Received Note</h3>
+                    <div className="doc-no font-mono font-bold text-sm text-slate-800 mt-1">
+                      PO #: {selectedPurchase.purchase_number}
+                    </div>
+                    <div className="mt-1">
+                      <span className="status-tag inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 no-print" /> Stock Inflow Verified
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Payment Method</div>
-                  <div className="font-bold text-slate-800 capitalize mt-0.5">
-                    {selectedPurchase.payment_method?.replace('_', ' ')}
+
+                {/* Meta Info Grid */}
+                <div className="meta-grid grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                  <div>
+                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Purchase Date</div>
+                    <div className="meta-val font-bold text-slate-800 mt-0.5">{selectedPurchase.purchase_date}</div>
+                  </div>
+                  <div>
+                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Payment Method</div>
+                    <div className="meta-val font-bold text-slate-800 capitalize mt-0.5">
+                      {selectedPurchase.payment_method?.replace('_', ' ')}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Supplier Bill / Inv #</div>
+                    <div className="meta-val font-bold text-slate-800 mt-0.5">
+                      {selectedPurchase.supplier_invoice_no || 'N/A'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Recorded By</div>
+                    <div className="meta-val font-bold text-slate-800 mt-0.5">
+                      {selectedPurchase.user?.name || 'Store Manager'}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">Supplier Bill #</div>
-                  <div className="font-bold text-slate-800 mt-0.5">
-                    {selectedPurchase.supplier_invoice_no || 'N/A'}
+
+                {/* Supplier Details Card */}
+                <div className="supplier-card p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Supplier Information</div>
+                  <div className="font-bold text-slate-900 text-sm">{selectedPurchase.supplier_name}</div>
+                  {selectedPurchase.supplier_phone && (
+                    <div className="text-slate-600 mt-0.5">Contact: {selectedPurchase.supplier_phone}</div>
+                  )}
+                </div>
+
+                {selectedPurchase.notes && (
+                  <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 font-medium">
+                    <span className="font-bold">Remarks / Batch Info: </span> {selectedPurchase.notes}
+                  </div>
+                )}
+
+                {/* Items List Table */}
+                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
+                      <tr>
+                        <th className="py-3 px-4">Item & Variant Specification</th>
+                        <th className="py-3 px-4 text-center">Unit Cost (Tk)</th>
+                        <th className="py-3 px-4 text-center">Qty Received</th>
+                        <th className="py-3 px-4 text-right">Line Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedPurchase.items?.map((it) => (
+                        <tr key={it.id}>
+                          <td className="py-3 px-4 font-semibold text-slate-900">
+                            {it.variant?.product?.name || 'Product'} - {it.variant?.variant_name}
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              SKU: {it.variant?.sku} {it.variant?.barcode && `| Barcode: ${it.variant?.barcode}`}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-slate-600">
+                            ৳{parseFloat(it.unit_cost).toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-800">
+                            {it.quantity} pcs
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-slate-900">
+                            ৳{parseFloat(it.line_total).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                      <tr>
+                        <td colSpan="3" className="py-3.5 px-4 text-right font-bold text-slate-700 text-xs uppercase">
+                          Total Procurement Value:
+                        </td>
+                        <td className="total-amount py-3.5 px-4 text-right font-black text-indigo-600 text-base">
+                          ৳{parseFloat(selectedPurchase.total_amount).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Signatures Block for GRN (Hidden on screen, shown in print) */}
+                <div className="signatures hidden print:flex justify-between items-center pt-8 border-t border-slate-200 mt-8">
+                  <div className="sig-box text-center">
+                    <div className="w-40 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
+                      Received By (Store Keeper)
+                    </div>
+                  </div>
+                  <div className="sig-box text-center">
+                    <div className="w-40 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
+                      Authorized Signatory (Accounts)
+                    </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {selectedPurchase.notes && (
-                <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-medium">
-                  <span className="font-bold">Remarks: </span> {selectedPurchase.notes}
-                </div>
-              )}
+            {/* Sticky Bottom Action Bar (No-Print) */}
+            <div className="no-print shrink-0 p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs text-slate-600">
+                <span>Total Items: <strong className="text-slate-900">{selectedPurchase.items?.length || 0}</strong></span>
+                <span className="mx-2">•</span>
+                <span>Total Value: <strong className="text-indigo-600 font-mono font-bold">৳{parseFloat(selectedPurchase.total_amount || 0).toFixed(2)}</strong></span>
+              </div>
 
-              {/* Items List */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
-                    <tr>
-                      <th className="py-3 px-4">Item & Variant</th>
-                      <th className="py-3 px-4 text-center">Unit Cost (Tk)</th>
-                      <th className="py-3 px-4 text-center">Qty Received</th>
-                      <th className="py-3 px-4 text-right">Line Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {selectedPurchase.items?.map((it) => (
-                      <tr key={it.id}>
-                        <td className="py-3 px-4 font-semibold text-slate-900">
-                          {it.variant?.product?.name || 'Product'} - {it.variant?.variant_name}
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            SKU: {it.variant?.sku} {it.variant?.barcode && `| Barcode: ${it.variant?.barcode}`}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center font-medium text-slate-600">
-                          ৳{parseFloat(it.unit_cost).toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-800">
-                          {it.quantity} pcs
-                        </td>
-                        <td className="py-3 px-4 text-right font-bold text-slate-900">
-                          ৳{parseFloat(it.line_total).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50 border-t border-slate-200">
-                    <tr>
-                      <td colSpan="3" className="py-3.5 px-4 text-right font-bold text-slate-700 text-xs uppercase">
-                        Grand Total Procurement Value:
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-black text-indigo-600 text-base">
-                        ৳{parseFloat(selectedPurchase.total_amount).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPurchase(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintGRN}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Goods Received Note</span>
+                </button>
               </div>
             </div>
           </div>
