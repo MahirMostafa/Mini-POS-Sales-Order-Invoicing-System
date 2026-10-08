@@ -96,7 +96,11 @@ class OrderService implements OrderServiceInterface
 
             $taxableAmount = max(0, $subtotal - $orderDiscount);
             $taxAmount = round($taxableAmount * ($taxPercent / 100), 2);
-            $grandTotal = round($taxableAmount + $taxAmount, 2);
+            $rawTotal = round($taxableAmount + $taxAmount, 2);
+
+            // Apply ceiling rounding for retail POS transactions (e.g. 380.50 -> 381.00)
+            $grandTotal = (float) ceil($rawTotal);
+            $roundingAmount = round($grandTotal - $rawTotal, 2);
 
             $paidAmount = min($grandTotal, max(0, (float) ($data['paid_amount'] ?? 0.00)));
             $changeAmount = max(0, (float) ($data['paid_amount'] ?? 0.00) - $grandTotal);
@@ -131,6 +135,7 @@ class OrderService implements OrderServiceInterface
                 'discount_amount' => $orderDiscount,
                 'tax_rate' => $taxPercent,
                 'tax_amount' => $taxAmount,
+                'rounding_amount' => $roundingAmount,
                 'grand_total' => $grandTotal,
                 'paid_amount' => $paidAmount,
                 'change_amount' => $changeAmount,

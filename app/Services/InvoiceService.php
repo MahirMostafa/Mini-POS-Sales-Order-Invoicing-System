@@ -34,6 +34,7 @@ class InvoiceService implements InvoiceServiceInterface
             'discount_amount' => $order->discount_amount,
             'tax_rate' => $order->tax_rate,
             'tax_amount' => $order->tax_amount,
+            'rounding_amount' => $order->rounding_amount ?? 0.00,
             'grand_total' => $order->grand_total,
             'paid_amount' => $order->paid_amount,
             'notes' => $order->notes,

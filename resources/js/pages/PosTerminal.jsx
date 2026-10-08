@@ -272,7 +272,9 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     ? parseFloat(selectedTaxRate.rate ?? selectedTaxRate.rate_percent ?? 0)
     : 0;
   const taxAmount = (netTaxableAmount * taxRatePercent) / 100;
-  const grandTotal = netTaxableAmount + taxAmount;
+  const rawTotal = netTaxableAmount + taxAmount;
+  const grandTotal = Math.ceil(rawTotal);
+  const roundingAdjustment = Math.round((grandTotal - rawTotal) * 100) / 100;
 
   // Clear Cart
   const handleResetCart = () => {
@@ -759,6 +761,13 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                   <span className="font-bold text-slate-800">+{currency}{taxAmount.toFixed(2)}</span>
                 </div>
 
+                {roundingAdjustment !== 0 && (
+                  <div className="flex justify-between text-indigo-600 font-medium">
+                    <span>Rounding (Ceil):</span>
+                    <span className="font-bold">{roundingAdjustment > 0 ? '+' : ''}{currency}{roundingAdjustment.toFixed(2)}</span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center pt-2 border-t border-slate-200">
                   <span className="font-black text-sm text-slate-900">Grand Total:</span>
                   <span className="font-black text-xl text-indigo-600">
@@ -821,6 +830,8 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
       <PosPaymentModal
         isOpen={isPaymentModalOpen}
         grandTotal={grandTotal}
+        rawTotal={rawTotal}
+        roundingAdjustment={roundingAdjustment}
         subtotal={subtotal}
         taxAmount={taxAmount}
         discountAmount={discountAmount}

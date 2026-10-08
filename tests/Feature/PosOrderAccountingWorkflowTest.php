@@ -111,8 +111,11 @@ class PosOrderAccountingWorkflowTest extends TestCase
             'discount_amount' => 0,
         ], $user->id);
 
-        // Complete Order
-        $result = $orderService->completeOrder($order, 304.50, 'cash');
+        $this->assertEquals(0.50, (float) $order->rounding_amount);
+        $this->assertEquals(305.00, (float) $order->grand_total);
+
+        // Complete Order with rounded grand total
+        $result = $orderService->completeOrder($order, $order->grand_total, 'cash');
 
         $this->assertTrue($result['success']);
 
@@ -122,9 +125,10 @@ class PosOrderAccountingWorkflowTest extends TestCase
         // 2. Order status completed
         $this->assertEquals('completed', $order->fresh()->status);
 
-        // 3. Invoice generated
+        // 3. Invoice generated with matching ceiling rounding
         $this->assertNotNull($order->fresh()->invoice);
         $this->assertStringStartsWith('INV-', $order->fresh()->invoice->invoice_number);
+        $this->assertEquals(0.50, (float) $order->fresh()->invoice->rounding_amount);
 
         // 4. Double-Entry Journal Entry strictly balanced
         $journalEntry = $order->fresh()->journalEntry;

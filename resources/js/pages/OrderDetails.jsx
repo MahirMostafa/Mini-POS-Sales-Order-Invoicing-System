@@ -330,6 +330,12 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
               <span>{taxRateName} ({taxPercentFormatted}):</span>
               <span className="font-bold text-slate-800">+{currency}{taxAmount.toFixed(2)}</span>
             </div>
+            {Number(order.rounding_amount || 0) !== 0 && (
+              <div className="flex justify-between text-indigo-600 font-medium">
+                <span>Rounding (Ceil):</span>
+                <span className="font-bold">{Number(order.rounding_amount) > 0 ? '+' : ''}{currency}{Number(order.rounding_amount).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
               <span className="font-black text-slate-900">Grand Total:</span>
               <span className="font-black text-xl text-indigo-600">

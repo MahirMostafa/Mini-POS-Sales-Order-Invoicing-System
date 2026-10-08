@@ -34,6 +34,7 @@ class AccountingService implements AccountingServiceInterface
         $grandTotal = (float) $order->grand_total;
         $netSales = (float) ($order->subtotal - $order->discount_amount);
         $taxAmount = (float) $order->tax_amount;
+        $roundingAmount = (float) ($order->rounding_amount ?? 0.00);
 
         // Entry 1: Debit Accounts Receivable (Full Order Amount)
         $items[] = [
@@ -43,12 +44,13 @@ class AccountingService implements AccountingServiceInterface
             'narration' => "Receivable from Customer: {$order->customer->name} (Order #{$order->order_number})",
         ];
 
-        // Entry 2: Credit Sales Revenue (Net Sales)
+        // Entry 2: Credit Sales Revenue (Net Sales + Rounding adjustment)
+        $revenueCredit = round($netSales + $roundingAmount, 2);
         $items[] = [
             'account_id' => $salesAccount->id,
             'debit' => 0.00,
-            'credit' => $netSales,
-            'narration' => "Sales Revenue generated from Order #{$order->order_number}",
+            'credit' => $revenueCredit,
+            'narration' => "Sales Revenue generated from Order #{$order->order_number}" . ($roundingAmount > 0 ? " (includes +{$roundingAmount} ceiling rounding)" : ""),
         ];
 
         // Entry 3: Credit Tax Payable (Tax Collected)
@@ -57,7 +59,7 @@ class AccountingService implements AccountingServiceInterface
                 'account_id' => $taxAccount->id,
                 'debit' => 0.00,
                 'credit' => $taxAmount,
-                'narration' => "5% Sales Tax / VAT Payable on Order #{$order->order_number}",
+                'narration' => "Sales Tax / VAT Payable on Order #{$order->order_number}",
             ];
         }
 

@@ -23,6 +23,7 @@ class Invoice extends Model
         'discount_amount',
         'tax_rate',
         'tax_amount',
+        'rounding_amount',
         'grand_total',
         'paid_amount',
         'notes',
@@ -38,6 +39,7 @@ class Invoice extends Model
             'discount_amount' => 'decimal:2',
             'tax_rate' => 'decimal:2',
             'tax_amount' => 'decimal:2',
+            'rounding_amount' => 'decimal:2',
             'grand_total' => 'decimal:2',
             'paid_amount' => 'decimal:2',
         ];

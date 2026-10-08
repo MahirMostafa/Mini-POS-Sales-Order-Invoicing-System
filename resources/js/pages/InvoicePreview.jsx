@@ -680,6 +680,13 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
               <span className="font-bold text-slate-900">+{currency}{Number(invoice.tax_amount).toFixed(2)}</span>
             </div>
 
+            {Number(invoice.rounding_amount || 0) !== 0 && (
+              <div className="flex justify-between text-slate-700 font-medium">
+                <span>Rounding (Ceil):</span>
+                <span>{Number(invoice.rounding_amount) > 0 ? '+' : ''}{currency}{Number(invoice.rounding_amount).toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="border-t border-dashed border-slate-400 my-1" />
 
             <div className="flex justify-between items-center text-xs font-black py-0.5 text-slate-900">

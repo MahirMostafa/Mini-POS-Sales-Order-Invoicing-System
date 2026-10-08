@@ -43,7 +43,13 @@ export default function PosThermalReceiptModal({
   const taxRateName = invoice?.tax_rate_name || order?.taxRate?.name || 'VAT';
   const taxRatePercent = parseFloat(invoice?.tax_rate_percent ?? order?.taxRate?.rate ?? order?.tax_amount ? ((order.tax_amount / (subtotal - discountAmount || 1)) * 100) : 0);
   const taxAmount = parseFloat(invoice?.tax_amount ?? order?.tax_amount ?? 0);
-  const grandTotal = parseFloat(invoice?.grand_total ?? order?.grand_total ?? (subtotal - discountAmount + taxAmount));
+  const rawTotal = subtotal - discountAmount + taxAmount;
+  const roundingAdjustment = invoice?.rounding_amount !== undefined && invoice?.rounding_amount !== null
+    ? parseFloat(invoice.rounding_amount)
+    : (order?.rounding_amount !== undefined && order?.rounding_amount !== null
+        ? parseFloat(order.rounding_amount)
+        : (Math.ceil(rawTotal) - rawTotal));
+  const grandTotal = parseFloat(invoice?.grand_total ?? order?.grand_total ?? Math.ceil(rawTotal));
   const paidAmount = parseFloat(invoice?.paid_amount ?? order?.paid_amount ?? grandTotal);
   const paymentMethod = (invoice?.payment_method || order?.payment_method || 'CASH').toUpperCase();
   const dueAmount = Math.max(0, grandTotal - paidAmount);
@@ -211,6 +217,13 @@ export default function PosThermalReceiptModal({
                 <div className="flex justify-between text-slate-600">
                   <span>{taxRateName} ({taxRatePercent.toFixed(1)}%):</span>
                   <span>+{currency}{taxAmount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {roundingAdjustment !== 0 && (
+                <div className="flex justify-between text-slate-700 font-medium">
+                  <span>Rounding (Ceil):</span>
+                  <span>{roundingAdjustment > 0 ? '+' : ''}{currency}{roundingAdjustment.toFixed(2)}</span>
                 </div>
               )}
 

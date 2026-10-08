@@ -14,6 +14,8 @@ import {
 export default function PosPaymentModal({
   isOpen,
   grandTotal,
+  rawTotal,
+  roundingAdjustment = 0,
   subtotal,
   taxAmount,
   discountAmount,
@@ -160,6 +162,9 @@ export default function PosPaymentModal({
               )}
               {taxAmount > 0 && (
                 <div>VAT / Tax: +{currency}{taxAmount.toFixed(2)}</div>
+              )}
+              {roundingAdjustment !== 0 && (
+                <div className="text-indigo-600 font-bold">Rounding (Ceil): {roundingAdjustment > 0 ? '+' : ''}{currency}{roundingAdjustment.toFixed(2)}</div>
               )}
             </div>
           </div>
