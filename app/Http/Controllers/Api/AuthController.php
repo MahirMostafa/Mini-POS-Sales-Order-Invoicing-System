@@ -2,14 +2,19 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        protected ?UserRepositoryInterface $userRepo = null
+    ) {
+    }
+
     public function me(): JsonResponse
     {
         $user = Auth::user();
@@ -60,7 +65,11 @@ class AuthController extends Controller
 
     public function quickLogin(int $userId): JsonResponse
     {
-        $user = User::with('roles')->findOrFail($userId);
+        $user = $this->userRepo ? $this->userRepo->findById($userId) : null;
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'User not found.'], 404);
+        }
+
         Auth::login($user);
         if (request()->hasSession()) {
             request()->session()->regenerate();
@@ -77,7 +86,7 @@ class AuthController extends Controller
 
     public function getDemoUsers(): JsonResponse
     {
-        $users = User::with('roles')->get();
+        $users = $this->userRepo ? $this->userRepo->all() : collect([]);
 
         return response()->json([
             'success' => true,

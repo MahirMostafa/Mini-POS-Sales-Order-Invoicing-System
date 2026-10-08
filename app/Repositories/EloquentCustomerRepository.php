@@ -21,7 +21,7 @@ class EloquentCustomerRepository implements CustomerRepositoryInterface
 
     public function paginate(int $perPage = 15, ?string $search = null): LengthAwarePaginator
     {
-        $query = Customer::query()->withCount('orders');
+        $query = Customer::withCount(['orders', 'invoices']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -32,12 +32,21 @@ class EloquentCustomerRepository implements CustomerRepositoryInterface
             });
         }
 
-        return $query->latest()->paginate($perPage);
+        return $query->latest('id')->paginate($perPage);
     }
 
     public function findById(int $id): ?Customer
     {
         return Customer::find($id);
+    }
+
+    public function findByIdWithDetails(int $id): ?Customer
+    {
+        return Customer::with(['orders' => function ($q) {
+            $q->latest()->take(5);
+        }, 'invoices' => function ($q) {
+            $q->latest()->take(5);
+        }])->withCount('orders')->find($id);
     }
 
     public function findByCode(string $code): ?Customer
@@ -48,8 +57,8 @@ class EloquentCustomerRepository implements CustomerRepositoryInterface
     public function create(array $data): Customer
     {
         if (empty($data['customer_code'])) {
-            $lastId = Customer::max('id') ?? 0;
-            $data['customer_code'] = 'CUST-' . str_pad($lastId + 1, 4, '0', STR_PAD_LEFT);
+            $count = Customer::count() + 1;
+            $data['customer_code'] = 'CUST-' . str_pad($count, 4, '0', STR_PAD_LEFT);
         }
 
         return Customer::create($data);
@@ -63,5 +72,26 @@ class EloquentCustomerRepository implements CustomerRepositoryInterface
     public function delete(Customer $customer): bool
     {
         return $customer->delete();
+    }
+
+    public function settleDue(Customer $customer, float $amount): float
+    {
+        $currentBalance = (float) $customer->credit_balance;
+        $newBalance = max(0, round($currentBalance - $amount, 2));
+        $customer->update(['credit_balance' => $newBalance]);
+        return $newBalance;
+    }
+
+    public function canDelete(Customer $customer): array
+    {
+        $customerWithCounts = Customer::withCount(['orders', 'invoices'])->find($customer->id);
+        $ordersCount = $customerWithCounts->orders_count ?? 0;
+        $invoicesCount = $customerWithCounts->invoices_count ?? 0;
+
+        return [
+            'can_delete' => ($ordersCount === 0 && $invoicesCount === 0),
+            'orders_count' => $ordersCount,
+            'invoices_count' => $invoicesCount,
+        ];
     }
 }

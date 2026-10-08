@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\CategoryRepositoryInterface;
 use App\Contracts\Repositories\CustomerRepositoryInterface;
 use App\Contracts\Repositories\ProductRepositoryInterface;
 use App\Contracts\Repositories\ProductVariantRepositoryInterface;
+use App\Contracts\Repositories\SettingRepositoryInterface;
 use App\Contracts\Repositories\TaxRateRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\ProductCategory;
-use App\Models\Setting;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,27 +18,21 @@ class PosController extends Controller
         protected ProductRepositoryInterface $productRepo,
         protected ProductVariantRepositoryInterface $variantRepo,
         protected CustomerRepositoryInterface $customerRepo,
-        protected TaxRateRepositoryInterface $taxRateRepo
+        protected TaxRateRepositoryInterface $taxRateRepo,
+        protected CategoryRepositoryInterface $categoryRepo,
+        protected SettingRepositoryInterface $settingRepo
     ) {
     }
 
     public function init(): JsonResponse
     {
         $products = $this->productRepo->getActiveWithVariants();
-        $categories = ProductCategory::where('is_active', true)->orderBy('name')->get();
+        $categories = $this->categoryRepo->getActive();
         $customers = $this->customerRepo->getActive();
         $taxRates = $this->taxRateRepo->getActive();
         $defaultTaxRate = $this->taxRateRepo->getDefault();
-        $currency = Setting::get('currency_symbol', '৳');
-        $company = [
-            'name' => Setting::get('company_name', 'MINI POS & RETAIL HUB'),
-            'address' => Setting::get('company_address', 'Dhaka, Bangladesh'),
-            'phone' => Setting::get('company_phone', '+880 1700-000000'),
-            'email' => Setting::get('company_email', 'billing@minipos.com'),
-            'tax_bin' => Setting::get('tax_number', 'BIN-99201928'),
-            'tax_number' => Setting::get('tax_number', 'BIN-99201928'),
-            'currency' => $currency,
-        ];
+        $currency = $this->settingRepo->getCurrencySymbol();
+        $company = $this->settingRepo->getCompanyInfo();
 
         return response()->json([
             'success' => true,

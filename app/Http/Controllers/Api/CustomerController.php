@@ -4,9 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\Repositories\CustomerRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\Customer;
-use App\Models\Order;
-use App\Models\Invoice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +18,7 @@ class CustomerController extends Controller
     {
         $user = auth()->user();
         if (!$user) {
-            return true; // fallback if session unauthenticated in testing
+            return true;
         }
 
         if ($user->hasRole('Admin')) {
@@ -66,11 +63,10 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $customer = Customer::with(['orders' => function ($q) {
-            $q->latest()->take(5);
-        }, 'invoices' => function ($q) {
-            $q->latest()->take(5);
-        }])->withCount('orders')->findOrFail($id);
+        $customer = $this->customerRepo->findByIdWithDetails($id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found.'], 404);
+        }
 
         return response()->json([
             'success' => true,
@@ -116,7 +112,10 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $customer = Customer::findOrFail($id);
+        $customer = $this->customerRepo->findById($id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found.'], 404);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -147,7 +146,10 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $customer = Customer::findOrFail($id);
+        $customer = $this->customerRepo->findById($id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found.'], 404);
+        }
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
@@ -156,17 +158,12 @@ class CustomerController extends Controller
         ]);
 
         $settleAmount = (float) $validated['amount'];
-        $currentBalance = (float) $customer->credit_balance;
-        $newBalance = max(0, round($currentBalance - $settleAmount, 2));
-
-        $customer->update(['credit_balance' => $newBalance]);
+        $newBalance = $this->customerRepo->settleDue($customer, $settleAmount);
 
         return response()->json([
             'success' => true,
             'message' => "Payment of ৳" . number_format($settleAmount, 2) . " received for customer '{$customer->name}'. Remaining due: ৳" . number_format($newBalance, 2) . ".",
-            'customer' => $customer->fresh(['orders' => function ($q) {
-                $q->latest()->take(10);
-            }, 'invoices']),
+            'customer' => $this->customerRepo->findByIdWithDetails($id),
         ]);
     }
 
@@ -179,12 +176,16 @@ class CustomerController extends Controller
             ], 403);
         }
 
-        $customer = Customer::withCount(['orders', 'invoices'])->findOrFail($id);
+        $customer = $this->customerRepo->findById($id);
+        if (!$customer) {
+            return response()->json(['success' => false, 'message' => 'Customer not found.'], 404);
+        }
 
-        if ($customer->orders_count > 0 || $customer->invoices_count > 0) {
+        $check = $this->customerRepo->canDelete($customer);
+        if (!$check['can_delete']) {
             return response()->json([
                 'success' => false,
-                'message' => "Cannot delete customer '{$customer->name}' because they have {$customer->orders_count} sales order(s) and {$customer->invoices_count} invoice(s) on record. You can deactivate them instead.",
+                'message' => "Cannot delete customer '{$customer->name}' because they have {$check['orders_count']} sales order(s) and {$check['invoices_count']} invoice(s) on record. You can deactivate them instead.",
             ], 422);
         }
 

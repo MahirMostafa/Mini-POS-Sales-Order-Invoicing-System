@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\RolePermissionRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 class RolePermissionController extends Controller
 {
+    public function __construct(
+        protected RolePermissionRepositoryInterface $rolePermissionRepo
+    ) {
+    }
+
     public function index(): JsonResponse
     {
-        $roles = Role::with('permissions')->get();
-        $permissions = Permission::all();
+        $roles = $this->rolePermissionRepo->getAllRoles();
+        $permissions = $this->rolePermissionRepo->getAllPermissions();
 
         return response()->json([
             'success' => true,
@@ -30,33 +34,33 @@ class RolePermissionController extends Controller
             'permissions.*' => 'exists:permissions,name',
         ]);
 
-        $role = Role::create(['name' => $validated['name'], 'guard_name' => 'web']);
-        if (!empty($validated['permissions'])) {
-            $role->syncPermissions($validated['permissions']);
-        }
+        $role = $this->rolePermissionRepo->createRole($validated['name'], $validated['permissions'] ?? []);
 
         return response()->json([
             'success' => true,
             'message' => "Role '{$role->name}' created successfully.",
-            'role' => $role->load('permissions'),
+            'role' => $role,
         ], 201);
     }
 
     public function updatePermissions(Request $request, int $roleId): JsonResponse
     {
-        $role = Role::findOrFail($roleId);
+        $role = $this->rolePermissionRepo->findRoleById($roleId);
+        if (!$role) {
+            return response()->json(['success' => false, 'message' => 'Role not found.'], 404);
+        }
 
         $validated = $request->validate([
             'permissions' => 'required|array',
             'permissions.*' => 'exists:permissions,name',
         ]);
 
-        $role->syncPermissions($validated['permissions']);
+        $this->rolePermissionRepo->updateRolePermissions($role, $validated['permissions']);
 
         return response()->json([
             'success' => true,
             'message' => "Permissions for role '{$role->name}' updated successfully.",
-            'role' => $role->load('permissions'),
+            'role' => $role->fresh(['permissions']),
         ]);
     }
 }

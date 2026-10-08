@@ -2,19 +2,24 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Contracts\Repositories\RolePermissionRepositoryInterface;
+use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    public function __construct(
+        protected UserRepositoryInterface $userRepo,
+        protected RolePermissionRepositoryInterface $roleRepo
+    ) {
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $users = User::with('roles')->latest('id')->paginate(15);
-        $roles = Role::all();
+        $users = $this->userRepo->paginate($request->integer('per_page', 15));
+        $roles = $this->roleRepo->getAllRoles();
 
         return response()->json([
             'success' => true,
@@ -32,25 +37,21 @@ class UserController extends Controller
             'role' => 'required|exists:roles,name',
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'email_verified_at' => now(),
-        ]);
-
-        $user->assignRole($validated['role']);
+        $user = $this->userRepo->create($validated, $validated['role']);
 
         return response()->json([
             'success' => true,
             'message' => "User '{$user->name}' created successfully with role {$validated['role']}.",
-            'user' => $user->load('roles'),
+            'user' => $user,
         ], 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->userRepo->findById($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'User not found.'], 404);
+        }
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -59,33 +60,27 @@ class UserController extends Controller
             'role' => 'required|exists:roles,name',
         ]);
 
-        $updateData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ];
-
-        if (!empty($validated['password'])) {
-            $updateData['password'] = Hash::make($validated['password']);
-        }
-
-        $user->update($updateData);
-        $user->syncRoles([$validated['role']]);
+        $this->userRepo->update($user, $validated, $validated['role']);
 
         return response()->json([
             'success' => true,
             'message' => "User '{$user->name}' updated successfully.",
-            'user' => $user->load('roles'),
+            'user' => $user->fresh(['roles']),
         ]);
     }
 
     public function destroy(int $id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->userRepo->findById($id);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'User not found.'], 404);
+        }
+
         if ($user->id === auth()->id()) {
             return response()->json(['success' => false, 'message' => 'You cannot delete your own account.'], 422);
         }
 
-        $user->delete();
+        $this->userRepo->delete($user);
 
         return response()->json([
             'success' => true,

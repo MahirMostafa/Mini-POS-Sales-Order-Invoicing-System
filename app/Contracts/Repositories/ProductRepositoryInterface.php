@@ -17,4 +17,8 @@ interface ProductRepositoryInterface
     public function update(Product $product, array $data): bool;
     public function delete(Product $product): bool;
     public function searchForPos(string $query): Collection;
+    public function createWithVariants(array $productData, array $variantsData): Product;
+    public function updateWithVariants(Product $product, array $productData, array $variantsData): Product;
+    public function canDelete(Product $product): array;
+    public function adjustStock(int $variantId, int $newStock, string $reason, int $userId): array;
 }

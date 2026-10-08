@@ -1,0 +1,140 @@
+<?php
+
+namespace App\Repositories;
+
+use App\Contracts\Repositories\PurchaseRepositoryInterface;
+use App\Contracts\Services\InventoryServiceInterface;
+use App\Models\ProductVariant;
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+
+class EloquentPurchaseRepository implements PurchaseRepositoryInterface
+{
+    public function __construct(
+        protected InventoryServiceInterface $inventoryService
+    ) {
+    }
+
+    public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
+    {
+        $query = Purchase::with(['items.variant.product', 'user']);
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('purchase_number', 'like', "%{$search}%")
+                  ->orWhere('supplier_name', 'like', "%{$search}%")
+                  ->orWhere('supplier_phone', 'like', "%{$search}%")
+                  ->orWhere('supplier_invoice_no', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['start_date'])) {
+            $query->whereDate('purchase_date', '>=', $filters['start_date']);
+        }
+
+        if (!empty($filters['end_date'])) {
+            $query->whereDate('purchase_date', '<=', $filters['end_date']);
+        }
+
+        if (!empty($filters['payment_method']) && $filters['payment_method'] !== 'all') {
+            $query->where('payment_method', $filters['payment_method']);
+        }
+
+        return $query->latest('purchase_date')->latest('id')->paginate($perPage);
+    }
+
+    public function findById(int $id): ?Purchase
+    {
+        return Purchase::with(['items.variant.product', 'user'])->find($id);
+    }
+
+    public function getSummary(array $filters = []): array
+    {
+        $statsQuery = Purchase::query();
+
+        if (!empty($filters['start_date'])) {
+            $statsQuery->whereDate('purchase_date', '>=', $filters['start_date']);
+        }
+        if (!empty($filters['end_date'])) {
+            $statsQuery->whereDate('purchase_date', '<=', $filters['end_date']);
+        }
+
+        $totalSpend = (float) $statsQuery->sum('total_amount');
+        $totalPurchasesCount = $statsQuery->count();
+        $totalItemsRestocked = (int) PurchaseItem::whereIn('purchase_id', $statsQuery->pluck('id'))->sum('quantity');
+
+        return [
+            'total_purchases' => $totalPurchasesCount,
+            'total_spend' => $totalSpend,
+            'total_items_restocked' => $totalItemsRestocked,
+        ];
+    }
+
+    public function getRecentSuppliers(int $limit = 20): Collection
+    {
+        return Purchase::query()
+            ->select('supplier_name', DB::raw('MAX(supplier_phone) as supplier_phone'))
+            ->whereNotNull('supplier_name')
+            ->where('supplier_name', '!=', '')
+            ->groupBy('supplier_name')
+            ->orderByDesc(DB::raw('MAX(id)'))
+            ->limit($limit)
+            ->get();
+    }
+
+    public function create(array $purchaseData, array $itemsData, int $userId): Purchase
+    {
+        return DB::transaction(function () use ($purchaseData, $itemsData, $userId) {
+            $datePrefix = date('Ymd');
+            $countToday = Purchase::whereDate('created_at', today())->count() + 1;
+            $purchaseNo = 'PO-' . $datePrefix . '-' . str_pad($countToday, 4, '0', STR_PAD_LEFT);
+
+            $totalAmount = 0.0;
+            foreach ($itemsData as $it) {
+                $totalAmount += ($it['quantity'] * $it['unit_cost']);
+            }
+
+            $purchase = Purchase::create([
+                'purchase_number' => $purchaseNo,
+                'supplier_name' => $purchaseData['supplier_name'],
+                'supplier_phone' => $purchaseData['supplier_phone'] ?? null,
+                'supplier_invoice_no' => $purchaseData['supplier_invoice_no'] ?? null,
+                'purchase_date' => $purchaseData['purchase_date'],
+                'status' => 'received',
+                'total_amount' => $totalAmount,
+                'paid_amount' => $purchaseData['paid_amount'] ?? $totalAmount,
+                'payment_method' => $purchaseData['payment_method'],
+                'notes' => $purchaseData['notes'] ?? null,
+                'user_id' => $userId,
+            ]);
+
+            foreach ($itemsData as $itemData) {
+                $variant = ProductVariant::findOrFail($itemData['product_variant_id']);
+
+                PurchaseItem::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $variant->product_id,
+                    'product_variant_id' => $variant->id,
+                    'quantity' => $itemData['quantity'],
+                    'unit_cost' => $itemData['unit_cost'],
+                    'line_total' => $itemData['quantity'] * $itemData['unit_cost'],
+                ]);
+
+                // Stock Replenishment & Weighted Average Costing (WAC)
+                $this->inventoryService->addStock(
+                    $variant,
+                    $itemData['quantity'],
+                    $itemData['unit_cost'],
+                    $userId,
+                    "Stock replenishment via Purchase Order #{$purchaseNo}"
+                );
+            }
+
+            return $purchase->load(['items.variant.product', 'user']);
+        });
+    }
+}
