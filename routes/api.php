@@ -76,6 +76,7 @@ Route::prefix('roles')->group(function () {
 Route::prefix('purchases')->group(function () {
     Route::get('/', [\App\Http\Controllers\Api\PurchaseController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\Api\PurchaseController::class, 'store']);
+    Route::post('/{id}/receive', [\App\Http\Controllers\Api\PurchaseController::class, 'receive']);
 });
 
 // Categories Management

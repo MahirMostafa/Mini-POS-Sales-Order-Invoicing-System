@@ -23,12 +23,15 @@ class Purchase extends Model
         'payment_method',
         'notes',
         'user_id',
+        'received_by_user_id',
+        'received_at',
     ];
 
     protected function casts(): array
     {
         return [
             'purchase_date' => 'date',
+            'received_at' => 'datetime',
             'total_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
         ];
@@ -42,5 +45,10 @@ class Purchase extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function receivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by_user_id');
     }
 }

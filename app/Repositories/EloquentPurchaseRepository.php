@@ -20,7 +20,7 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
 
     public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
-        $query = Purchase::with(['items.variant.product', 'user']);
+        $query = Purchase::with(['items.variant.product', 'user', 'receivedBy']);
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -30,6 +30,10 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                   ->orWhere('supplier_phone', 'like', "%{$search}%")
                   ->orWhere('supplier_invoice_no', 'like', "%{$search}%");
             });
+        }
+
+        if (!empty($filters['status']) && $filters['status'] !== 'all') {
+            $query->where('status', $filters['status']);
         }
 
         if (!empty($filters['start_date'])) {
@@ -49,7 +53,7 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
 
     public function findById(int $id): ?Purchase
     {
-        return Purchase::with(['items.variant.product', 'user'])->find($id);
+        return Purchase::with(['items.variant.product', 'user', 'receivedBy'])->find($id);
     }
 
     public function getSummary(array $filters = []): array
@@ -63,12 +67,18 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
             $statsQuery->whereDate('purchase_date', '<=', $filters['end_date']);
         }
 
-        $totalSpend = (float) $statsQuery->sum('total_amount');
-        $totalPurchasesCount = $statsQuery->count();
-        $totalItemsRestocked = (int) PurchaseItem::whereIn('purchase_id', $statsQuery->pluck('id'))->sum('quantity');
+        $totalSpend = (float) (clone $statsQuery)->sum('total_amount');
+        $totalPurchasesCount = (clone $statsQuery)->count();
+        $receivedPurchasesCount = (clone $statsQuery)->where('status', 'received')->count();
+        $pendingPurchasesCount = (clone $statsQuery)->where('status', 'pending')->count();
+        
+        $receivedIds = (clone $statsQuery)->where('status', 'received')->pluck('id');
+        $totalItemsRestocked = (int) PurchaseItem::whereIn('purchase_id', $receivedIds)->sum('quantity');
 
         return [
             'total_purchases' => $totalPurchasesCount,
+            'received_purchases' => $receivedPurchasesCount,
+            'pending_purchases' => $pendingPurchasesCount,
             'total_spend' => $totalSpend,
             'total_items_restocked' => $totalItemsRestocked,
         ];
@@ -93,6 +103,9 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
             $countToday = Purchase::whereDate('created_at', today())->count() + 1;
             $purchaseNo = 'PO-' . $datePrefix . '-' . str_pad($countToday, 4, '0', STR_PAD_LEFT);
 
+            $status = $purchaseData['status'] ?? 'pending';
+            $isReceived = $status === 'received';
+
             $totalAmount = 0.0;
             foreach ($itemsData as $it) {
                 $totalAmount += ($it['quantity'] * $it['unit_cost']);
@@ -104,12 +117,14 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                 'supplier_phone' => $purchaseData['supplier_phone'] ?? null,
                 'supplier_invoice_no' => $purchaseData['supplier_invoice_no'] ?? null,
                 'purchase_date' => $purchaseData['purchase_date'],
-                'status' => 'received',
+                'status' => $status,
                 'total_amount' => $totalAmount,
                 'paid_amount' => $purchaseData['paid_amount'] ?? $totalAmount,
                 'payment_method' => $purchaseData['payment_method'],
                 'notes' => $purchaseData['notes'] ?? null,
                 'user_id' => $userId,
+                'received_by_user_id' => $isReceived ? $userId : null,
+                'received_at' => $isReceived ? now() : null,
             ]);
 
             foreach ($itemsData as $itemData) {
@@ -124,17 +139,51 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                     'line_total' => $itemData['quantity'] * $itemData['unit_cost'],
                 ]);
 
+                // Stock Replenishment & Weighted Average Costing (WAC) ONLY if received immediately
+                if ($isReceived) {
+                    $this->inventoryService->addStock(
+                        $variant,
+                        $itemData['quantity'],
+                        $itemData['unit_cost'],
+                        $userId,
+                        "Stock replenishment via Purchase Order #{$purchaseNo}"
+                    );
+                }
+            }
+
+            return $purchase->load(['items.variant.product', 'user', 'receivedBy']);
+        });
+    }
+
+    public function receive(Purchase $purchase, int $userId): Purchase
+    {
+        if ($purchase->status === 'received') {
+            throw new \DomainException("Purchase Order #{$purchase->purchase_number} has already been received.");
+        }
+
+        return DB::transaction(function () use ($purchase, $userId) {
+            $purchase->update([
+                'status' => 'received',
+                'received_by_user_id' => $userId,
+                'received_at' => now(),
+            ]);
+
+            $purchase->loadMissing('items.variant');
+
+            foreach ($purchase->items as $item) {
+                $variant = $item->variant ?: ProductVariant::findOrFail($item->product_variant_id);
+
                 // Stock Replenishment & Weighted Average Costing (WAC)
                 $this->inventoryService->addStock(
                     $variant,
-                    $itemData['quantity'],
-                    $itemData['unit_cost'],
+                    $item->quantity,
+                    (float) $item->unit_cost,
                     $userId,
-                    "Stock replenishment via Purchase Order #{$purchaseNo}"
+                    "Goods received & verified via Purchase Order #{$purchase->purchase_number}"
                 );
             }
 
-            return $purchase->load(['items.variant.product', 'user']);
+            return $purchase->fresh(['items.variant.product', 'user', 'receivedBy']);
         });
     }
 }

@@ -13,4 +13,5 @@ interface PurchaseRepositoryInterface
     public function getSummary(array $filters = []): array;
     public function getRecentSuppliers(int $limit = 20): Collection;
     public function create(array $purchaseData, array $itemsData, int $userId): Purchase;
+    public function receive(Purchase $purchase, int $userId): Purchase;
 }

@@ -18,6 +18,7 @@ class PurchaseController extends Controller
     {
         $filters = [
             'search' => $request->get('search'),
+            'status' => $request->get('status'),
             'start_date' => $request->get('start_date'),
             'end_date' => $request->get('end_date'),
             'payment_method' => $request->get('payment_method'),
@@ -43,6 +44,7 @@ class PurchaseController extends Controller
             'supplier_phone' => 'nullable|string|max:50',
             'supplier_invoice_no' => 'nullable|string|max:50',
             'purchase_date' => 'required|date',
+            'status' => 'nullable|string|in:pending,received',
             'payment_method' => 'required|string|in:cash,bank_transfer,card,credit',
             'paid_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
@@ -55,10 +57,50 @@ class PurchaseController extends Controller
         $userId = auth()->id() ?? 1;
         $purchase = $this->purchaseRepo->create($validated, $validated['items'], $userId);
 
+        $msg = $purchase->status === 'received'
+            ? "Purchase Order #{$purchase->purchase_number} recorded & goods received into stock successfully."
+            : "Purchase Order #{$purchase->purchase_number} created in Pending state. Awaiting physical goods receipt.";
+
         return response()->json([
             'success' => true,
-            'message' => "Purchase Order #{$purchase->purchase_number} recorded and stock replenished successfully.",
+            'message' => $msg,
             'purchase' => $purchase,
         ], 201);
+    }
+
+    public function receive(Request $request, int $id): JsonResponse
+    {
+        $purchase = $this->purchaseRepo->findById($id);
+
+        if (!$purchase) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Purchase Order not found.',
+            ], 404);
+        }
+
+        if ($purchase->status === 'received') {
+            return response()->json([
+                'success' => false,
+                'message' => "Purchase Order #{$purchase->purchase_number} has already been received on {$purchase->received_at}.",
+            ], 422);
+        }
+
+        $userId = auth()->id() ?? 1;
+
+        try {
+            $updated = $this->purchaseRepo->receive($purchase, $userId);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Goods Received Note confirmed! Stock replenished and Weighted Average Costing updated.",
+                'purchase' => $updated,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 }

@@ -25,17 +25,29 @@ import {
   Package,
   Phone,
   CreditCard,
-  Store
+  Store,
+  Clock,
+  UserCheck,
+  User,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { printDocument } from '../utils/printReceipt';
 
 export default function PurchaseManagement() {
   const [purchases, setPurchases] = useState([]);
   const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
-  const [summary, setSummary] = useState({ total_purchases: 0, total_spend: 0, total_items_restocked: 0 });
+  const [summary, setSummary] = useState({
+    total_purchases: 0,
+    received_purchases: 0,
+    pending_purchases: 0,
+    total_spend: 0,
+    total_items_restocked: 0
+  });
   const [recentSuppliers, setRecentSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [variantsList, setVariantsList] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [company, setCompany] = useState({
     name: 'MINI POS & RETAIL HUB',
     address: 'Dhaka, Bangladesh',
@@ -47,6 +59,7 @@ export default function PurchaseManagement() {
 
   // Filters & Search
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'received'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', 'today', 'yesterday', 'this_week', 'this_month', 'custom'
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -57,6 +70,7 @@ export default function PurchaseManagement() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [receivingId, setReceivingId] = useState(null);
 
   // Barcode & Product Search inside New Purchase Modal
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -75,6 +89,7 @@ export default function PurchaseManagement() {
     supplier_phone: '',
     supplier_invoice_no: '',
     purchase_date: new Date().toISOString().split('T')[0],
+    status: 'pending', // default to pending per user request
     payment_method: 'bank_transfer',
     notes: '',
     items: []
@@ -122,6 +137,7 @@ export default function PurchaseManagement() {
       const params = new URLSearchParams();
       params.append('page', page);
       if (search) params.append('search', search);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
       if (startDate) params.append('start_date', startDate);
       if (endDate) params.append('end_date', endDate);
       if (paymentMethodFilter !== 'all') params.append('payment_method', paymentMethodFilter);
@@ -151,9 +167,10 @@ export default function PurchaseManagement() {
   // Fetch Products & POS Info
   const fetchProductsCatalog = async () => {
     try {
-      const [resProducts, resPosInit] = await Promise.allSettled([
+      const [resProducts, resPosInit, resMe] = await Promise.allSettled([
         api.get('/products?per_page=150'),
-        api.get('/pos/init')
+        api.get('/pos/init'),
+        api.get('/auth/me')
       ]);
 
       if (resProducts.status === 'fulfilled') {
@@ -187,6 +204,10 @@ export default function PurchaseManagement() {
       if (resPosInit.status === 'fulfilled' && resPosInit.value.data.company) {
         setCompany(resPosInit.value.data.company);
       }
+
+      if (resMe.status === 'fulfilled' && resMe.value.data.user) {
+        setCurrentUser(resMe.value.data.user);
+      }
     } catch (err) {
       console.error('Failed to load products catalog', err);
     }
@@ -194,7 +215,7 @@ export default function PurchaseManagement() {
 
   useEffect(() => {
     fetchPurchases(currentPage);
-  }, [currentPage, search, startDate, endDate, paymentMethodFilter]);
+  }, [currentPage, search, statusFilter, startDate, endDate, paymentMethodFilter]);
 
   useEffect(() => {
     fetchProductsCatalog();
@@ -223,6 +244,7 @@ export default function PurchaseManagement() {
       supplier_phone: '',
       supplier_invoice_no: '',
       purchase_date: new Date().toISOString().split('T')[0],
+      status: 'pending',
       payment_method: 'bank_transfer',
       notes: '',
       items: []
@@ -384,6 +406,7 @@ export default function PurchaseManagement() {
         supplier_phone: formData.supplier_phone.trim() || null,
         supplier_invoice_no: formData.supplier_invoice_no.trim() || null,
         purchase_date: formData.purchase_date,
+        status: formData.status || 'pending',
         payment_method: formData.payment_method,
         notes: formData.notes.trim() || null,
         items: formData.items.map((it) => ({
@@ -397,8 +420,8 @@ export default function PurchaseManagement() {
       if (res.data.success) {
         Swal.fire({
           icon: 'success',
-          title: 'Stock Replenished!',
-          text: res.data.message || 'Purchase order recorded & Weighted Average Costing updated.',
+          title: formData.status === 'received' ? 'Goods Received & Stocked!' : 'Purchase Order Created!',
+          text: res.data.message || 'Purchase order recorded successfully.',
           timer: 2000,
           showConfirmButton: false,
         });
@@ -419,6 +442,65 @@ export default function PurchaseManagement() {
     }
   };
 
+  // Receive Goods Action (Two-stage procurement confirmation)
+  const handleReceivePurchase = async (p) => {
+    const totalItemsCount = p.items?.length || 0;
+    const totalUnitsCount = p.items?.reduce((s, it) => s + parseInt(it.quantity || 0, 10), 0) || 0;
+
+    const result = await Swal.fire({
+      title: `Receive PO #${p.purchase_number}?`,
+      html: `
+        <div style="text-align: left; font-size: 13px; line-height: 1.5; color: #334155;">
+          <p style="margin-bottom: 4px;"><strong>Supplier:</strong> ${p.supplier_name}</p>
+          <p style="margin-bottom: 4px;"><strong>Items to Receive:</strong> ${totalItemsCount} products (${totalUnitsCount} total units)</p>
+          <p style="margin-bottom: 8px;"><strong>Total Value:</strong> ৳${Number(p.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+          <div style="background-color: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; color: #92400e; font-size: 11px;">
+            <strong>Inventory Audit & Tracking:</strong><br/>
+            Confirming this will immediately add these units into live warehouse inventory, recalculate Weighted Average Costing (WAC), and record your user account as the official Goods Receiver.
+          </div>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Confirm & Add to Stock',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#4f46e5',
+      cancelButtonColor: '#94a3b8',
+    });
+
+    if (result.isConfirmed) {
+      setReceivingId(p.id);
+      try {
+        const res = await api.post(`/purchases/${p.id}/receive`);
+        if (res.data.success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Stock Replenished!',
+            text: res.data.message || 'Goods received into stock and audit trail logged.',
+            timer: 2000,
+            showConfirmButton: false,
+          });
+
+          await fetchPurchases(currentPage);
+          await fetchProductsCatalog();
+
+          if (selectedPurchase && selectedPurchase.id === p.id) {
+            setSelectedPurchase(res.data.purchase);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Receipt Failed',
+          text: err.response?.data?.message || 'Failed to confirm goods receipt.',
+        });
+      } finally {
+        setReceivingId(null);
+      }
+    }
+  };
+
   // Print GRN / Goods Received Note
   const handlePrintGRN = () => {
     if (!selectedPurchase) return;
@@ -432,11 +514,11 @@ export default function PurchaseManagement() {
         <div>
           <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
             <Truck className="w-4 h-4" />
-            <span>Procurement & Stock Inflow</span>
+            <span>Two-Stage Procurement & Goods Inflow</span>
           </div>
           <h2 className="text-xl font-black text-slate-900">Manage Purchases & Inventory Replenishment</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Barcode-driven supplier purchase orders, instant stock restocking & automated Weighted Average Costing (WAC).
+            Create Purchase Orders (Pending) & Confirm Goods Receipts with audit user tracking & Weighted Average Costing (WAC).
           </p>
         </div>
 
@@ -453,43 +535,56 @@ export default function PurchaseManagement() {
       </div>
 
       {/* KPI Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Spend (Purchases)</div>
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Spend</div>
             <div className="text-xl font-black text-slate-900 mt-0.5">
               ৳{Number(summary.total_spend || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
-            <div className="text-[10px] text-slate-500 font-medium">Cumulative inventory acquisition cost</div>
+            <div className="text-[10px] text-slate-500 font-medium">Cumulative acquisition cost</div>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-            <FileText className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Purchases</div>
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Received & Stocked</div>
             <div className="text-xl font-black text-slate-900 mt-0.5">
-              {summary.total_purchases || 0} Orders
+              {summary.received_purchases || 0} Orders
             </div>
-            <div className="text-[10px] text-slate-500 font-medium">Recorded supplier orders</div>
+            <div className="text-[10px] text-slate-500 font-medium">Physically stocked into inventory</div>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Delivery</div>
+            <div className="text-xl font-black text-amber-600 mt-0.5">
+              {summary.pending_purchases || 0} Orders
+            </div>
+            <div className="text-[10px] text-slate-500 font-medium">Awaiting goods receipt verification</div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
             <PackageCheck className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Units Inflow</div>
+            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stock Restocked</div>
             <div className="text-xl font-black text-slate-900 mt-0.5">
               {summary.total_items_restocked || 0} Units
             </div>
-            <div className="text-[10px] text-slate-500 font-medium">Restocked to warehouse / POS shelves</div>
+            <div className="text-[10px] text-slate-500 font-medium">Net units added to inventory</div>
           </div>
         </div>
       </div>
@@ -512,52 +607,62 @@ export default function PurchaseManagement() {
             />
           </div>
 
-          {/* Quick Date Presets */}
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
-            {[
-              { id: 'all', label: 'All Dates' },
-              { id: 'today', label: 'Today' },
-              { id: 'yesterday', label: 'Yesterday' },
-              { id: 'this_week', label: 'This Week' },
-              { id: 'this_month', label: 'This Month' },
-              { id: 'custom', label: 'Custom' },
-            ].map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => handleDateFilterChange(d.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  dateFilter === d.id
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+          {/* Filter Dropdowns */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full lg:w-auto">
+            {/* Status Dropdown */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
               >
-                {d.label}
-              </button>
-            ))}
-          </div>
+                <option value="all">All Statuses</option>
+                <option value="pending">Pending Receipt</option>
+                <option value="received">Received & Stocked</option>
+              </select>
+            </div>
 
-          {/* Payment Method Filter */}
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-            <select
-              value={paymentMethodFilter}
-              onChange={(e) => {
-                setPaymentMethodFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-            >
-              <option value="all">All Payment Methods</option>
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="cash">Cash Counter</option>
-              <option value="card">Corporate Card</option>
-              <option value="credit">Supplier Credit / A/P</option>
-            </select>
+            {/* Date Range Dropdown */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={dateFilter}
+                onChange={(e) => handleDateFilterChange(e.target.value)}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this_week">This Week</option>
+                <option value="this_month">This Month</option>
+                <option value="custom">Custom Date Range</option>
+              </select>
+            </div>
+
+            {/* Payment Method Dropdown */}
+            <div className="w-full sm:w-auto">
+              <select
+                value={paymentMethodFilter}
+                onChange={(e) => {
+                  setPaymentMethodFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all cursor-pointer"
+              >
+                <option value="all">All Payment Methods</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="cash">Cash Counter</option>
+                <option value="card">Corporate Card</option>
+                <option value="credit">Supplier Credit / A/P</option>
+              </select>
+            </div>
 
             <button
               type="button"
               onClick={() => fetchPurchases(currentPage)}
-              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-2xs transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 shadow-2xs transition-colors cursor-pointer shrink-0"
               title="Refresh list"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -606,7 +711,7 @@ export default function PurchaseManagement() {
                 <th className="py-3.5 px-6">Supplier Details</th>
                 <th className="py-3.5 px-6">Date</th>
                 <th className="py-3.5 px-6">Status</th>
-                <th className="py-3.5 px-6">Payment</th>
+                <th className="py-3.5 px-6">User Tracking</th>
                 <th className="py-3.5 px-6 text-right">Total (Tk)</th>
                 <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
@@ -627,59 +732,99 @@ export default function PurchaseManagement() {
                     </div>
                     <p className="font-bold text-slate-700">No purchase orders found</p>
                     <p className="text-xs text-slate-400 mt-1">
-                      Click "New Purchase Order" to record goods received and replenish inventory.
+                      Click "New Purchase Order" to create a procurement order.
                     </p>
                   </td>
                 </tr>
               ) : (
-                purchases.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-4 px-6">
-                      <span className="font-bold font-mono text-indigo-600 text-xs bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
-                        {p.purchase_number}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="font-bold text-slate-900">{p.supplier_name}</div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                        {p.supplier_invoice_no && (
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium">
-                            Bill #{p.supplier_invoice_no}
+                purchases.map((p) => {
+                  const isPending = p.status === 'pending';
+                  const isReceiving = receivingId === p.id;
+                  const receiver = p.received_by || p.receivedBy;
+
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-4 px-6">
+                        <span className="font-bold font-mono text-indigo-600 text-xs bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
+                          {p.purchase_number}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="font-bold text-slate-900">{p.supplier_name}</div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                          {p.supplier_invoice_no && (
+                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium">
+                              Bill #{p.supplier_invoice_no}
+                            </span>
+                          )}
+                          {p.supplier_phone && <span>{p.supplier_phone}</span>}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 font-medium text-slate-600">
+                        {p.purchase_date}
+                      </td>
+                      <td className="py-4 px-6">
+                        {isPending ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Pending Receipt
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Received & Stocked
                           </span>
                         )}
-                        {p.supplier_phone && <span>{p.supplier_phone}</span>}
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 font-medium text-slate-600">
-                      {p.purchase_date}
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Received & Stocked
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="capitalize px-2 py-0.5 rounded-md bg-slate-100 font-semibold text-slate-700 text-[11px]">
-                        {p.payment_method?.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right font-black text-slate-900 text-sm">
-                      ৳{Number(p.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-4 px-6 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPurchase(p)}
-                        className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-                        title="View Goods Received Note"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View / GRN</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="text-xs text-slate-800 flex items-center gap-1 font-medium">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Ordered by: <strong>{p.user?.name || 'Staff'}</strong></span>
+                        </div>
+                        {isPending ? (
+                          <div className="text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-0.5">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            <span>Awaiting physical goods receipt</span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-700 font-medium flex items-center gap-1 mt-0.5">
+                            <UserCheck className="w-3 h-3 shrink-0 text-emerald-600" />
+                            <span>Received by: <strong>{receiver?.name || p.user?.name || 'Storekeeper'}</strong></span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-right font-black text-slate-900 text-sm">
+                        ৳{Number(p.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {isPending && (
+                            <button
+                              type="button"
+                              onClick={() => handleReceivePurchase(p)}
+                              disabled={isReceiving}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                              title="Confirm Goods Receipt and add to stock"
+                            >
+                              <PackageCheck className="w-3.5 h-3.5" />
+                              <span>{isReceiving ? 'Receiving...' : 'Receive Goods'}</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPurchase(p)}
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                            title="View Goods Received Note"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>{isPending ? 'View PO' : 'View / GRN'}</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -714,7 +859,7 @@ export default function PurchaseManagement() {
         )}
       </div>
 
-      {/* UPGRADED NEW PURCHASE ORDER MODAL */}
+      {/* NEW PURCHASE ORDER MODAL (TWO-STAGE SELECTION) */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-6 flex flex-col max-h-[92vh]">
@@ -727,7 +872,7 @@ export default function PurchaseManagement() {
                 <div>
                   <h3 className="font-black text-base text-slate-900">New Supplier Purchase Order</h3>
                   <p className="text-xs text-slate-500">
-                    Scan Barcodes or Search Products to restock stock with real-time Weighted Average Costing (WAC)
+                    Two-Stage Procurement: Record pending orders or receive shipments into stock with audit logging
                   </p>
                 </div>
               </div>
@@ -742,6 +887,62 @@ export default function PurchaseManagement() {
 
             {/* Modal Body */}
             <form onSubmit={handleSubmitPurchase} className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* STAGE SELECTION: PENDING VS IMMEDIATE RECEIVE */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div
+                  onClick={() => setFormData({ ...formData, status: 'pending' })}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                    formData.status === 'pending'
+                      ? 'border-indigo-600 bg-indigo-50/60 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-xs font-black text-indigo-950 uppercase tracking-wider">
+                      <Clock className="w-4 h-4 text-indigo-600" />
+                      1. Pending Order (Awaiting Goods)
+                    </span>
+                    <input
+                      type="radio"
+                      name="procurement_mode"
+                      checked={formData.status === 'pending'}
+                      onChange={() => setFormData({ ...formData, status: 'pending' })}
+                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    (Recommended) Saves purchase order without modifying stock. Stock and WAC will update only when goods are physically received and verified by an authorized receiver.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setFormData({ ...formData, status: 'received' })}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                    formData.status === 'received'
+                      ? 'border-emerald-600 bg-emerald-50/60 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-xs font-black text-emerald-950 uppercase tracking-wider">
+                      <PackageCheck className="w-4 h-4 text-emerald-600" />
+                      2. Immediate Goods Receipt (In-Hand)
+                    </span>
+                    <input
+                      type="radio"
+                      name="procurement_mode"
+                      checked={formData.status === 'received'}
+                      onChange={() => setFormData({ ...formData, status: 'received' })}
+                      className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Shipment is physically in hand right now. Immediately increases stock inventory and recalculates Weighted Average Costing (WAC) with you as the receiver.
+                  </p>
+                </div>
+              </div>
+
               {/* Supplier & Order Meta Header */}
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                 {/* Supplier Name with Autocomplete */}
@@ -1163,10 +1364,20 @@ export default function PurchaseManagement() {
                   <button
                     type="submit"
                     disabled={submitting || formData.items.length === 0}
-                    className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-md disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      formData.status === 'received'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
+                    }`}
                   >
-                    <PackageCheck className="w-4 h-4" />
-                    <span>{submitting ? 'Replenishing Stock...' : 'Confirm & Replenish Stock'}</span>
+                    {formData.status === 'received' ? <PackageCheck className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                    <span>
+                      {submitting
+                        ? 'Processing...'
+                        : formData.status === 'received'
+                        ? 'Confirm & Stock Inflow Now'
+                        : 'Save as Pending Purchase Order'}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -1183,17 +1394,31 @@ export default function PurchaseManagement() {
             {/* Modal Top Header (Sticky, No-Print) */}
             <div className="no-print shrink-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/95 backdrop-blur-xs">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center ${
+                  selectedPurchase.status === 'pending'
+                    ? 'bg-amber-50 border border-amber-200 text-amber-600'
+                    : 'bg-indigo-50 border border-indigo-100 text-indigo-600'
+                }`}>
                   <Truck className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">
-                    Goods Received Note (GRN) #{selectedPurchase.purchase_number}
+                    {selectedPurchase.status === 'pending' ? 'Purchase Order (PO)' : 'Goods Received Note (GRN)'} #{selectedPurchase.purchase_number}
                   </h3>
                   <p className="text-[10px] text-slate-400">Supplier: {selectedPurchase.supplier_name}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {selectedPurchase.status === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={() => handleReceivePurchase(selectedPurchase)}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <PackageCheck className="w-3.5 h-3.5" />
+                    <span>Receive Goods</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handlePrintGRN}
@@ -1201,7 +1426,7 @@ export default function PurchaseManagement() {
                   title="Print Goods Received Note"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print GRN</span>
+                  <span>Print Document</span>
                 </button>
                 <button
                   type="button"
@@ -1233,17 +1458,42 @@ export default function PurchaseManagement() {
                   </div>
 
                   <div className="doc-badge text-right">
-                    <h3 className="doc-title text-lg font-black text-indigo-600 uppercase">Goods Received Note</h3>
+                    <h3 className="doc-title text-lg font-black text-indigo-600 uppercase">
+                      {selectedPurchase.status === 'pending' ? 'Purchase Order (PO)' : 'Goods Received Note (GRN)'}
+                    </h3>
                     <div className="doc-no font-mono font-bold text-sm text-slate-800 mt-1">
                       PO #: {selectedPurchase.purchase_number}
                     </div>
                     <div className="mt-1">
-                      <span className="status-tag inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3 no-print" /> Stock Inflow Verified
-                      </span>
+                      {selectedPurchase.status === 'pending' ? (
+                        <span className="status-tag inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                          <Clock className="w-3 h-3 no-print" /> Pending Physical Receipt
+                        </span>
+                      ) : (
+                        <span className="status-tag inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3 no-print" /> Stock Inflow Verified & Added
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* Status Notice Banner (when pending) */}
+                {selectedPurchase.status === 'pending' && (
+                  <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between no-print">
+                    <div className="flex items-center gap-2 text-xs text-amber-900">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>This shipment has not yet been received. Inventory stock levels are not updated yet.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleReceivePurchase(selectedPurchase)}
+                      className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-xs cursor-pointer"
+                    >
+                      Receive Goods Now
+                    </button>
+                  </div>
+                )}
 
                 {/* Meta Info Grid */}
                 <div className="meta-grid grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
@@ -1264,20 +1514,41 @@ export default function PurchaseManagement() {
                     </div>
                   </div>
                   <div>
-                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Recorded By</div>
+                    <div className="meta-label text-[10px] font-bold text-slate-400 uppercase">Ordered By</div>
                     <div className="meta-val font-bold text-slate-800 mt-0.5">
-                      {selectedPurchase.user?.name || 'Store Manager'}
+                      {selectedPurchase.user?.name || 'Store Staff'}
                     </div>
                   </div>
                 </div>
 
-                {/* Supplier Details Card */}
-                <div className="supplier-card p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">Supplier Information</div>
-                  <div className="font-bold text-slate-900 text-sm">{selectedPurchase.supplier_name}</div>
-                  {selectedPurchase.supplier_phone && (
-                    <div className="text-slate-600 mt-0.5">Contact: {selectedPurchase.supplier_phone}</div>
-                  )}
+                {/* Goods Receiver Tracking Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Supplier Details</div>
+                    <div className="font-bold text-slate-900 mt-0.5">{selectedPurchase.supplier_name}</div>
+                    {selectedPurchase.supplier_phone && (
+                      <div className="text-slate-500 text-[11px] mt-0.5">Tel: {selectedPurchase.supplier_phone}</div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase">Goods Receipt & Receiver Audit</div>
+                    {selectedPurchase.status === 'received' ? (
+                      <div className="mt-0.5">
+                        <div className="font-bold text-emerald-800 flex items-center gap-1">
+                          <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Received by: {selectedPurchase.received_by?.name || selectedPurchase.receivedBy?.name || 'Authorized Receiving Officer'}</span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          Received at: {selectedPurchase.received_at ? new Date(selectedPurchase.received_at).toLocaleString() : 'N/A'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-amber-700 font-semibold flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Awaiting physical inspection & receipt</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {selectedPurchase.notes && (
@@ -1293,7 +1564,7 @@ export default function PurchaseManagement() {
                       <tr>
                         <th className="py-3 px-4">Item & Variant Specification</th>
                         <th className="py-3 px-4 text-center">Unit Cost (Tk)</th>
-                        <th className="py-3 px-4 text-center">Qty Received</th>
+                        <th className="py-3 px-4 text-center">Qty {selectedPurchase.status === 'received' ? 'Received' : 'Ordered'}</th>
                         <th className="py-3 px-4 text-right">Line Total</th>
                       </tr>
                     </thead>
@@ -1334,12 +1605,17 @@ export default function PurchaseManagement() {
                 {/* Signatures Block for GRN (Hidden on screen, shown in print) */}
                 <div className="signatures hidden print:flex justify-between items-center pt-8 border-t border-slate-200 mt-8">
                   <div className="sig-box text-center">
-                    <div className="w-40 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
-                      Received By (Store Keeper)
+                    <div className="w-44 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
+                      Ordered By: {selectedPurchase.user?.name || 'Purchasing Officer'}
                     </div>
                   </div>
                   <div className="sig-box text-center">
-                    <div className="w-40 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
+                    <div className="w-44 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
+                      Received By: {selectedPurchase.received_by?.name || selectedPurchase.receivedBy?.name || 'Store Keeper'}
+                    </div>
+                  </div>
+                  <div className="sig-box text-center">
+                    <div className="w-44 border-t border-slate-400 mx-auto pt-1 text-[11px] font-bold text-slate-600">
                       Authorized Signatory (Accounts)
                     </div>
                   </div>
@@ -1356,6 +1632,17 @@ export default function PurchaseManagement() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                {selectedPurchase.status === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={() => handleReceivePurchase(selectedPurchase)}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <PackageCheck className="w-3.5 h-3.5" />
+                    <span>Confirm & Receive Goods</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setSelectedPurchase(null)}
@@ -1369,7 +1656,7 @@ export default function PurchaseManagement() {
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Goods Received Note</span>
+                  <span>Print Document</span>
                 </button>
               </div>
             </div>

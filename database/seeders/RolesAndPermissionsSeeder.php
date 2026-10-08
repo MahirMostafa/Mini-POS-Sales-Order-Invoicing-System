@@ -28,6 +28,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'delete-categories',
             'manage-categories',
             'manage-purchases',
+            'receive-purchases',
             'view-customers',
             'create-customers',
             'edit-customers',
