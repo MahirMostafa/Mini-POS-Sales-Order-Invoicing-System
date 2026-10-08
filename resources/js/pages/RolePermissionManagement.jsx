@@ -24,6 +24,11 @@ export default function RolePermissionManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // New Role Modal State
+  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [creatingRole, setCreatingRole] = useState(false);
+
   const fetchRolesAndPermissions = async () => {
     setLoading(true);
     try {
@@ -59,6 +64,43 @@ export default function RolePermissionManagement() {
   const handleSelectRole = (role) => {
     setSelectedRole(role);
     setSelectedPermissions(role.permissions?.map((p) => p.name) || []);
+  };
+
+  const handleCreateRole = async (e) => {
+    e.preventDefault();
+    if (!newRoleName.trim()) return;
+    setCreatingRole(true);
+    try {
+      const res = await api.post('/roles', {
+        name: newRoleName.trim(),
+        permissions: []
+      });
+      if (res.data.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Role Created!',
+          text: `Role "${newRoleName.trim()}" created successfully. You can now configure its permissions below.`,
+          timer: 1500,
+          showConfirmButton: false
+        });
+        setNewRoleName('');
+        setIsAddRoleModalOpen(false);
+        await fetchRolesAndPermissions();
+        // Select the newly created role
+        if (res.data.role) {
+          setSelectedRole(res.data.role);
+          setSelectedPermissions([]);
+        }
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err.response?.data?.message || 'Failed to create role.'
+      });
+    } finally {
+      setCreatingRole(false);
+    }
   };
 
   const handleTogglePermission = (permName) => {
@@ -166,15 +208,26 @@ export default function RolePermissionManagement() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving || !selectedRole}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-all"
-        >
-          <Save className="w-4 h-4" />
-          <span>{saving ? 'Saving...' : 'Save Permissions Matrix'}</span>
-        </button>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsAddRoleModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Custom Role</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !selectedRole}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-all"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? 'Saving...' : 'Save Permissions Matrix'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Role Selection Tabs */}
@@ -326,6 +379,66 @@ export default function RolePermissionManagement() {
               <Save className="w-4 h-4" />
               <span>{saving ? 'Saving...' : 'Save Changes'}</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Custom Role Modal */}
+      {isAddRoleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Create New Spatie Role</h3>
+                  <p className="text-[10px] text-slate-400">Define a new custom organizational role</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddRoleModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRole} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Role Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Branch Manager, Inventory Auditor, Sales Lead"
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-semibold"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Once created, you can toggle its granular atomic permissions in the matrix and assign staff to it.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddRoleModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingRole}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                >
+                  {creatingRole ? 'Creating...' : 'Create Role'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
