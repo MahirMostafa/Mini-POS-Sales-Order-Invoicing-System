@@ -19,6 +19,10 @@ class TaxRate extends Model
         'is_active',
     ];
 
+    protected $appends = [
+        'rate_percent',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -26,6 +30,11 @@ class TaxRate extends Model
             'is_default' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getRatePercentAttribute(): float
+    {
+        return (float) ($this->rate ?? 0);
     }
 
     public function account(): BelongsTo

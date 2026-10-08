@@ -261,7 +261,9 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
 
   const netTaxableAmount = Math.max(0, subtotal - discountAmount);
 
-  const taxRatePercent = selectedTaxRate ? parseFloat(selectedTaxRate.rate_percent) : 0;
+  const taxRatePercent = selectedTaxRate
+    ? parseFloat(selectedTaxRate.rate ?? selectedTaxRate.rate_percent ?? 0)
+    : 0;
   const taxAmount = (netTaxableAmount * taxRatePercent) / 100;
   const grandTotal = netTaxableAmount + taxAmount;
 
@@ -681,7 +683,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                 >
                   {taxRates.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} ({Number(t.rate_percent).toFixed(1)}%)
+                      {t.name} ({Number(t.rate ?? t.rate_percent ?? 0).toFixed(1)}%)
                     </option>
                   ))}
                 </select>
