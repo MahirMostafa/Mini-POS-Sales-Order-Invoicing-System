@@ -11,6 +11,7 @@ import OrderDetails from './pages/OrderDetails';
 import InvoicePreview from './pages/InvoicePreview';
 import AccountingDashboard from './pages/AccountingDashboard';
 import ProductCatalog from './pages/ProductCatalog';
+import CategoryManagement from './pages/CategoryManagement';
 import PurchaseManagement from './pages/PurchaseManagement';
 import TaxManagement from './pages/TaxManagement';
 import UserManagement from './pages/UserManagement';
@@ -182,6 +183,15 @@ function DashboardLayout() {
             />
 
             {/* Inventory & Purchasing */}
+            <Route
+              path="/categories"
+              element={
+                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['manage-categories', 'view-categories']}>
+                  <CategoryManagement />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/products"
               element={

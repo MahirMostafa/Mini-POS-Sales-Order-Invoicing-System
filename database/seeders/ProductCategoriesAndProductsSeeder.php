@@ -32,6 +32,21 @@ class ProductCategoriesAndProductsSeeder extends Seeder
             ['name' => 'Health & Skincare', 'description' => 'Lotions, serums, and organic care']
         );
 
+        $apparelCat = ProductCategory::firstOrCreate(
+            ['slug' => 'apparel-fashion'],
+            ['name' => 'Apparel & Fashion', 'description' => 'Clothing, accessories, and wearable goods']
+        );
+
+        $snacksCat = ProductCategory::firstOrCreate(
+            ['slug' => 'snacks-confectionery'],
+            ['name' => 'Snacks & Confectionery', 'description' => 'Chocolates, biscuits, roasted nuts, and sweets']
+        );
+
+        $officeCat = ProductCategory::firstOrCreate(
+            ['slug' => 'stationery-office'],
+            ['name' => 'Stationery & Office Supplies', 'description' => 'Notebooks, pens, desk organizers, and paper products']
+        );
+
         // 2. Product: Perfume - ABC (with Variants as specifically requested by user!)
         $perfume = Product::firstOrCreate(
             ['slug' => 'perfume-abc'],

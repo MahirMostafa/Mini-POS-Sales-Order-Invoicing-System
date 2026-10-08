@@ -7,6 +7,8 @@ use Illuminate\Support\ServiceProvider;
 // Repository Contracts & Implementations
 use App\Contracts\Repositories\CustomerRepositoryInterface;
 use App\Repositories\EloquentCustomerRepository;
+use App\Contracts\Repositories\CategoryRepositoryInterface;
+use App\Repositories\EloquentCategoryRepository;
 use App\Contracts\Repositories\ProductRepositoryInterface;
 use App\Repositories\EloquentProductRepository;
 use App\Contracts\Repositories\ProductVariantRepositoryInterface;
@@ -42,6 +44,7 @@ class RepositoryServiceProvider extends ServiceProvider
     {
         // Bind Repositories
         $this->app->bind(CustomerRepositoryInterface::class, EloquentCustomerRepository::class);
+        $this->app->bind(CategoryRepositoryInterface::class, EloquentCategoryRepository::class);
         $this->app->bind(ProductRepositoryInterface::class, EloquentProductRepository::class);
         $this->app->bind(ProductVariantRepositoryInterface::class, EloquentProductVariantRepository::class);
         $this->app->bind(OrderRepositoryInterface::class, EloquentOrderRepository::class);

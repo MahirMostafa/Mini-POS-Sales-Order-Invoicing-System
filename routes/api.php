@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PosController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TaxRateController;
 use Illuminate\Support\Facades\Route;
@@ -77,6 +78,16 @@ Route::prefix('purchases')->group(function () {
     Route::post('/', [\App\Http\Controllers\Api\PurchaseController::class, 'store']);
 });
 
+// Categories Management
+Route::prefix('categories')->group(function () {
+    Route::get('/', [CategoryController::class, 'index']);
+    Route::post('/', [CategoryController::class, 'store']);
+    Route::get('/{id}', [CategoryController::class, 'show']);
+    Route::put('/{id}', [CategoryController::class, 'update']);
+    Route::post('/{id}/toggle-status', [CategoryController::class, 'toggleStatus']);
+    Route::delete('/{id}', [CategoryController::class, 'destroy']);
+});
+
 // Products & Inventory
 
 Route::prefix('products')->group(function () {
@@ -94,6 +105,7 @@ Route::prefix('customers')->group(function () {
     Route::post('/', [CustomerController::class, 'store']);
     Route::get('/{id}', [CustomerController::class, 'show']);
     Route::put('/{id}', [CustomerController::class, 'update']);
+    Route::post('/{id}/settle-due', [CustomerController::class, 'settleDue']);
     Route::delete('/{id}', [CustomerController::class, 'destroy']);
 });
 

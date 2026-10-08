@@ -159,6 +159,11 @@ export default function RolePermissionManagement() {
     'delete-customers': { title: 'Delete Customers', desc: 'Can delete customers that have no prior sales/invoice history' },
     'manage-customers': { title: 'Manage All Customer Data', desc: 'Super permission covering all customer operations' },
     'manage-products': { title: 'Manage Products & Variants', desc: 'Can create, edit, delete products, variants, SKUs and barcodes' },
+    'view-categories': { title: 'View Product Categories', desc: 'Can view product category catalog and hierarchy' },
+    'create-categories': { title: 'Create Product Categories', desc: 'Can add new product categories' },
+    'edit-categories': { title: 'Edit Product Categories', desc: 'Can update category names, slugs, and active status' },
+    'delete-categories': { title: 'Delete Product Categories', desc: 'Can remove categories with zero assigned products' },
+    'manage-categories': { title: 'Manage All Categories', desc: 'Super permission covering all product category operations' },
     'manage-purchases': { title: 'Manage Supplier Purchases', desc: 'Can record purchase orders, supplier costs and replenish inventory' },
     'manage-tax-rates': { title: 'Manage VAT & Tax Rates', desc: 'Can create and configure dynamic tax rates and default tax rule' },
     'view-accounting-dashboard': { title: 'View Accounting Dashboard', desc: 'Can inspect Revenue, COGS, Gross Margin & Profit summaries' },
@@ -178,8 +183,8 @@ export default function RolePermissionManagement() {
     if (name.includes('pos') || name.includes('order') || name.includes('invoice')) {
       return 'POS, Sales & Billing';
     }
-    if (name.includes('product') || name.includes('purchase')) {
-      return 'Inventory & Supplier Purchases';
+    if (name.includes('product') || name.includes('category') || name.includes('purchase')) {
+      return 'Inventory, Categories & Purchasing';
     }
     if (name.includes('accounting') || name.includes('ledger') || name.includes('journal') || name.includes('tax')) {
       return 'Double-Entry Accounting & Taxes';

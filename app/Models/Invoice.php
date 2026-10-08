@@ -43,6 +43,19 @@ class Invoice extends Model
         ];
     }
 
+    protected $appends = [
+        'customer_name',
+        'customer_phone',
+        'customer_email',
+        'customer_address',
+        'customer_tax_number',
+        'due_amount',
+        'payment_method',
+        'payment_status',
+        'tax_rate_percent',
+        'tax_rate_name',
+    ];
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
@@ -63,8 +76,56 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function getCustomerNameAttribute(): string
+    {
+        return $this->customer?->name ?? 'Walk-in Customer';
+    }
+
+    public function getCustomerPhoneAttribute(): ?string
+    {
+        return $this->customer?->phone;
+    }
+
+    public function getCustomerEmailAttribute(): ?string
+    {
+        return $this->customer?->email;
+    }
+
+    public function getCustomerAddressAttribute(): ?string
+    {
+        return $this->customer?->address;
+    }
+
+    public function getCustomerTaxNumberAttribute(): ?string
+    {
+        return $this->customer?->tax_number;
+    }
+
     public function getDueAmountAttribute(): float
     {
         return (float) max(0, $this->grand_total - $this->paid_amount);
+    }
+
+    public function getPaymentMethodAttribute(): string
+    {
+        return $this->order?->payment_method ?? 'cash';
+    }
+
+    public function getPaymentStatusAttribute(): string
+    {
+        if ($this->order?->payment_status) {
+            return $this->order->payment_status;
+        }
+        return $this->paid_amount >= $this->grand_total ? 'paid' : ($this->paid_amount > 0 ? 'partially_paid' : 'unpaid');
+    }
+
+    public function getTaxRatePercentAttribute(): float
+    {
+        return (float) ($this->tax_rate ?? 5.00);
+    }
+
+    public function getTaxRateNameAttribute(): string
+    {
+        return 'VAT';
     }
 }

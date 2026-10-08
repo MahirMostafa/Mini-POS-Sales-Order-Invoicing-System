@@ -7,6 +7,7 @@ import {
   Receipt,
   FileText,
   Package,
+  Tags,
   Truck,
   Calculator,
   Percent,
@@ -71,6 +72,13 @@ export default function Sidebar({
     {
       title: 'Inventory & Procurement',
       items: [
+        {
+          path: '/categories',
+          label: 'Manage Categories',
+          icon: Tags,
+          roles: ['Admin'],
+          permissions: ['manage-categories', 'view-categories']
+        },
         {
           path: '/products',
           label: 'Manage Products',

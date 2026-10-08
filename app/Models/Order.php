@@ -51,6 +51,15 @@ class Order extends Model
         ];
     }
 
+    protected $appends = [
+        'due_amount',
+    ];
+
+    public function getDueAmountAttribute(): float
+    {
+        return (float) max(0, (float) $this->grand_total - (float) $this->paid_amount);
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);

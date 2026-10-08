@@ -30,7 +30,15 @@ class PosController extends Controller
         $taxRates = $this->taxRateRepo->getActive();
         $defaultTaxRate = $this->taxRateRepo->getDefault();
         $currency = Setting::get('currency_symbol', '৳');
-        $companyName = Setting::get('company_name', 'Mini POS Enterprise');
+        $company = [
+            'name' => Setting::get('company_name', 'MINI POS & RETAIL HUB'),
+            'address' => Setting::get('company_address', 'Dhaka, Bangladesh'),
+            'phone' => Setting::get('company_phone', '+880 1700-000000'),
+            'email' => Setting::get('company_email', 'billing@minipos.com'),
+            'tax_bin' => Setting::get('tax_number', 'BIN-99201928'),
+            'tax_number' => Setting::get('tax_number', 'BIN-99201928'),
+            'currency' => $currency,
+        ];
 
         return response()->json([
             'success' => true,
@@ -40,7 +48,8 @@ class PosController extends Controller
             'tax_rates' => $taxRates,
             'default_tax_rate' => $defaultTaxRate,
             'currency' => $currency,
-            'company_name' => $companyName,
+            'company' => $company,
+            'company_name' => $company['name'],
         ]);
     }
 

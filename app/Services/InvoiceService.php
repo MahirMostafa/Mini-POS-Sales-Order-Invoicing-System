@@ -61,11 +61,11 @@ class InvoiceService implements InvoiceServiceInterface
 
     public function getPrintableInvoiceData(Invoice $invoice): array
     {
-        $companyName = Setting::get('company_name', 'Mini POS Enterprise');
-        $companyAddress = Setting::get('company_address', '123 Commercial Area, Dhaka, Bangladesh');
+        $companyName = Setting::get('company_name', 'Mini POS & Retail Hub');
+        $companyAddress = Setting::get('company_address', 'Dhaka, Bangladesh');
         $companyPhone = Setting::get('company_phone', '+880 1700-000000');
-        $companyEmail = Setting::get('company_email', 'contact@minipos.com');
-        $taxNumber = Setting::get('tax_number', 'BIN-123456789');
+        $companyEmail = Setting::get('company_email', 'billing@minipos.com');
+        $taxNumber = Setting::get('tax_number', 'BIN-99201928');
         $currencySymbol = Setting::get('currency_symbol', '৳');
 
         return [
@@ -76,6 +76,7 @@ class InvoiceService implements InvoiceServiceInterface
                 'phone' => $companyPhone,
                 'email' => $companyEmail,
                 'tax_number' => $taxNumber,
+                'tax_bin' => $taxNumber,
                 'currency' => $currencySymbol,
             ],
         ];

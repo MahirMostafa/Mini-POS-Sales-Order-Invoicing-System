@@ -16,11 +16,29 @@ import {
   UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
 export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
+  const navigate = useNavigate();
   const { user, role } = useAuth();
   const isAdmin = role === 'Admin' || user?.roles?.[0]?.name === 'Admin';
+
+  const handleNavigateOrder = (orderId) => {
+    if (onNavigateToOrder) {
+      onNavigateToOrder(orderId);
+    } else {
+      navigate(`/orders/${orderId}`);
+    }
+  };
+
+  const handleNavigateInvoice = (invId) => {
+    if (onNavigateToInvoice) {
+      onNavigateToInvoice(invId);
+    } else {
+      navigate(`/invoices/${invId}`);
+    }
+  };
 
   const [orders, setOrders] = useState([]);
   const [pagination, setPagination] = useState({});
@@ -84,7 +102,7 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
           confirmButtonColor: '#4f46e5',
         }).then((result) => {
           if (result.isConfirmed && res.data.invoice) {
-            onNavigateToInvoice?.(res.data.invoice.id);
+            handleNavigateInvoice(res.data.invoice.id);
           }
         });
 
@@ -235,7 +253,13 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-4 px-6 font-bold font-mono text-indigo-600">
-                        {order.order_number}
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateOrder(order.id)}
+                          className="hover:underline text-left cursor-pointer font-bold font-mono text-indigo-600"
+                        >
+                          {order.order_number}
+                        </button>
                       </td>
                       <td className="py-4 px-6">
                         <div className="font-bold text-slate-900">{order.customer?.name || 'Walk-in'}</div>
@@ -278,8 +302,8 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => onNavigateToOrder?.(order.id)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1 font-bold text-[11px]"
+                            onClick={() => handleNavigateOrder(order.id)}
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1 font-bold text-[11px] cursor-pointer"
                             title="View order audit details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -290,19 +314,19 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                             <button
                               type="button"
                               onClick={() => setActiveOrderToComplete(order)}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                             >
                               <CheckCircle className="w-3 h-3" />
                               <span>Complete</span>
                             </button>
                           )}
 
-                          {isCompleted && order.invoice && (
+                          {isCompleted && (
                             <button
                               type="button"
-                              onClick={() => onNavigateToInvoice?.(order.invoice.id)}
-                              className="p-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors font-bold text-[11px] inline-flex items-center gap-1"
-                              title="Print Invoice"
+                              onClick={() => handleNavigateInvoice(order.invoice?.id || order.id)}
+                              className="p-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer"
+                              title="Print / View Invoice"
                             >
                               <FileText className="w-3.5 h-3.5" />
                               <span>Invoice</span>

@@ -110,6 +110,27 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
   const isCompleted = order.status === 'completed';
   const isCancelled = order.status === 'cancelled';
 
+  const subtotal = parseFloat(order.subtotal || 0);
+  const discountAmount = parseFloat(order.discount_amount || 0);
+  const discountRate = parseFloat(order.discount_rate || 0);
+  const taxAmount = parseFloat(order.tax_amount || 0);
+  const taxRateName = order.taxRate?.name || order.tax_rate_name || 'VAT';
+  const taxableBase = Math.max(0, subtotal - discountAmount);
+
+  // Derive tax percentage accurately
+  let taxRatePercent = 0;
+  if (Number(order.tax_rate) > 0) {
+    taxRatePercent = Number(order.tax_rate);
+  } else if (order.taxRate?.rate && Number(order.taxRate.rate) > 0) {
+    taxRatePercent = Number(order.taxRate.rate);
+  } else if (taxAmount > 0 && taxableBase > 0) {
+    taxRatePercent = (taxAmount / taxableBase) * 100;
+  }
+
+  const taxPercentFormatted = taxRatePercent > 0
+    ? `${taxRatePercent % 1 === 0 ? taxRatePercent.toFixed(0) : taxRatePercent.toFixed(1)}%`
+    : (taxAmount > 0 ? '5%' : '0%');
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       {/* Top Bar with Back button */}
@@ -225,12 +246,12 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
           </div>
 
           <div>
-            <span className="text-slate-400 block mb-0.5 font-bold uppercase text-[10px]">Tax & Discounts</span>
+            <span className="text-slate-400 block mb-0.5 font-bold uppercase text-[10px]">VAT & Discounts</span>
             <div className="font-bold text-slate-900">
-              Tax applied: {order.tax_rate_percent}% ({order.tax_rate_name})
+              {taxRateName} ({taxPercentFormatted}): +{currency}{taxAmount.toFixed(2)}
             </div>
-            <div className="text-slate-500">
-              Discount: {order.discount_type === 'percent' ? `${order.discount_value}%` : `${currency}${order.discount_value}`}
+            <div className="text-slate-500 mt-0.5 font-medium">
+              Discount: {discountAmount > 0 ? (discountRate > 0 ? `${discountRate}% (-${currency}${discountAmount.toFixed(2)})` : `-${currency}${discountAmount.toFixed(2)}`) : 'None (৳0.00)'}
             </div>
           </div>
         </div>
@@ -297,17 +318,17 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
           <div className="w-full sm:w-72 space-y-2 text-xs">
             <div className="flex justify-between text-slate-500">
               <span>Subtotal:</span>
-              <span className="font-bold text-slate-800">{currency}{Number(order.subtotal).toFixed(2)}</span>
+              <span className="font-bold text-slate-800">{currency}{subtotal.toFixed(2)}</span>
             </div>
-            {Number(order.discount_amount) > 0 && (
-              <div className="flex justify-between text-rose-600">
-                <span>Discount:</span>
-                <span>-{currency}{Number(order.discount_amount).toFixed(2)}</span>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-rose-600 font-medium">
+                <span>Discount {discountRate > 0 ? `(${discountRate}%)` : ''}:</span>
+                <span className="font-bold">-{currency}{discountAmount.toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between text-slate-500">
-              <span>Tax ({order.tax_rate_percent}%):</span>
-              <span className="font-bold text-slate-800">+{currency}{Number(order.tax_amount).toFixed(2)}</span>
+              <span>{taxRateName} ({taxPercentFormatted}):</span>
+              <span className="font-bold text-slate-800">+{currency}{taxAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
               <span className="font-black text-slate-900">Grand Total:</span>

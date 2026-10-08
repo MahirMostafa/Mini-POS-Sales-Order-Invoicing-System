@@ -34,6 +34,12 @@ class InvoiceItem extends Model
         ];
     }
 
+    protected $appends = [
+        'product_name',
+        'variant_name',
+        'sku',
+    ];
+
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
@@ -47,5 +53,20 @@ class InvoiceItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function getProductNameAttribute(): string
+    {
+        return $this->item_name;
+    }
+
+    public function getVariantNameAttribute(): ?string
+    {
+        return $this->variant?->variant_name;
+    }
+
+    public function getSkuAttribute(): ?string
+    {
+        return $this->item_sku;
     }
 }

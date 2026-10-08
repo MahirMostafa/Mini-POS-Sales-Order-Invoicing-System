@@ -16,6 +16,8 @@ import {
   RefreshCw,
   Eye
 } from 'lucide-react';
+import BarcodeSvg from '../components/BarcodeSvg';
+import { printThermalReceipt } from '../utils/printReceipt';
 
 export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSelectInvoice }) {
   const { id } = useParams();
@@ -27,6 +29,7 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
   const [invoicesList, setInvoicesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('pos'); // 'pos' | 'a4'
   const currency = '৳';
 
   const handleBack = onBack || (() => navigate('/invoices'));
@@ -70,7 +73,7 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
   }, [effectiveInvoiceId]);
 
   const handlePrint = () => {
-    window.print();
+    printThermalReceipt('pos-thermal-receipt');
   };
 
   // If no single invoice is selected, show list of invoices
@@ -81,11 +84,11 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
           <div>
             <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
               <Receipt className="w-4 h-4" />
-              <span>Commercial Tax Invoices</span>
+              <span>POS Invoices & Sales Receipts</span>
             </div>
             <h2 className="text-xl font-black text-slate-900">Invoices & Receipts Registry</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Preview, download, and print official tax invoices generated from completed orders.
+              Preview, download, and print 80mm thermal POS receipts generated from sales.
             </p>
           </div>
 
@@ -210,175 +213,181 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       {/* Top action controls (Hidden during print) */}
-      <div className="no-print flex items-center justify-between">
+      <div className="no-print flex items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Invoices
+          <ArrowLeft className="w-4 h-4" /> Back to Receipts
         </button>
 
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all"
-        >
-          <Printer className="w-4 h-4" /> Print Tax Invoice
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 font-medium px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+            <Receipt className="w-3.5 h-3.5 text-indigo-600" />
+            <span>80mm POS Receipt</span>
+          </div>
+
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Print POS Receipt</span>
+          </button>
+        </div>
       </div>
 
-      {/* Printable Invoice Card */}
-      <div
-        id="invoice-card"
-        className="bg-white text-slate-900 rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-xl space-y-8 font-sans print:p-0 print:border-none print:shadow-none"
-      >
-        {/* Invoice Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start pb-6 border-b border-slate-200 gap-6">
-          <div className="space-y-1">
-            <div className="text-xl font-black tracking-tight text-indigo-600 flex items-center gap-2">
-              <Building2 className="w-6 h-6 text-indigo-600" />
-              {company.name || 'Mini POS & ERP Enterprise'}
+      {/* 80mm POS Thermal Receipt Display */}
+      <div className="flex justify-center">
+        <div
+          id="pos-thermal-receipt"
+          className="pos-receipt-print-area bg-white text-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xl w-full max-w-[320px] font-mono text-[11px] leading-tight space-y-2 print:border-none print:shadow-none print:p-0 print:m-0 print:w-[72mm] print:text-[10px]"
+        >
+          {/* Store Header */}
+          <div className="text-center space-y-0.5 pb-1">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center mx-auto mb-1 no-print">
+              <Building2 className="w-3.5 h-3.5" />
             </div>
-            <p className="text-xs text-slate-500 font-medium">{company.address || 'Dhaka, Bangladesh'}</p>
-            <p className="text-xs text-slate-500 font-medium">
-              Phone: {company.phone || '+880 1700-000000'} • Email: {company.email || 'billing@minipos.com'}
-            </p>
+            <h2 className="font-black text-xs uppercase tracking-wider text-slate-900 font-sans">
+              {company.name || 'MINI POS & RETAIL HUB'}
+            </h2>
+            <p className="text-[9px] text-slate-600 font-sans">{company.address || 'Dhaka, Bangladesh'}</p>
+            <p className="text-[9px] text-slate-600">Tel: {company.phone || '+880 1700-000000'}</p>
             {company.tax_bin && (
-              <p className="text-xs font-bold text-slate-700 font-mono">
-                VAT BIN Reg: {company.tax_bin}
-              </p>
+              <p className="text-[9px] text-slate-600 font-bold">VAT BIN: {company.tax_bin}</p>
             )}
           </div>
 
-          <div className="sm:text-right space-y-1">
-            <span className="inline-block font-black text-xl text-slate-900 tracking-tight uppercase">
-              TAX INVOICE
-            </span>
-            <div className="text-base font-black font-mono text-indigo-600">
-              #{invoice.invoice_number}
-            </div>
-            <div className="text-xs text-slate-500">
-              Date: <span className="font-bold text-slate-800">{invoice.invoice_date}</span>
-            </div>
-            <div className="text-xs text-slate-500">
-              Order Ref: <span className="font-mono font-bold text-slate-800">{invoice.order?.order_number || 'N/A'}</span>
-            </div>
-          </div>
-        </div>
+          <div className="border-t border-dashed border-slate-400 my-1" />
 
-        {/* Bill To & Payment Info */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs bg-slate-50 p-5 rounded-2xl border border-slate-200">
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Billed To Customer:
-            </span>
-            <div className="font-black text-sm text-slate-900">{invoice.customer_name}</div>
-            <div className="text-slate-600 font-medium">{invoice.customer_phone || 'N/A'}</div>
-            <div className="text-slate-500">{invoice.customer_email || ''}</div>
-            <div className="text-slate-500">{invoice.customer_address || 'Standard retail counter'}</div>
-            {invoice.customer_tax_number && (
-              <div className="font-mono text-slate-700 mt-1 font-bold">BIN / TIN: {invoice.customer_tax_number}</div>
-            )}
-          </div>
-
-          <div className="sm:text-right space-y-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Payment & Settlement:
-            </span>
-            <div>
-              <span className="text-slate-500">Payment Method: </span>
-              <span className="font-bold uppercase text-slate-800">{invoice.payment_method?.replace('_', ' ')}</span>
+          {/* Receipt Metadata */}
+          <div className="space-y-0.5 text-[10px] leading-tight">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Invoice #:</span>
+              <span className="font-bold text-slate-900">{invoice.invoice_number}</span>
             </div>
-            <div>
-              <span className="text-slate-500">Payment Status: </span>
-              <span className="font-black text-emerald-600 uppercase">{invoice.payment_status}</span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Order Ref:</span>
+              <span className="font-bold text-slate-800">{invoice.order?.order_number || '-'}</span>
             </div>
-            <div>
-              <span className="text-slate-500">Issued By: </span>
-              <span className="font-medium text-slate-800">{invoice.user?.name || 'Authorized Counter Cashier'}</span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Date:</span>
+              <span className="text-slate-800">{String(invoice.invoice_date || '').split('T')[0]}</span>
             </div>
-          </div>
-        </div>
-
-        {/* Line Items Table */}
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4">Item & Specification</th>
-                <th className="py-3 px-4">SKU Code</th>
-                <th className="py-3 px-4 text-right">Unit Price</th>
-                <th className="py-3 px-4 text-center">Qty</th>
-                <th className="py-3 px-4 text-right">Line Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {invoice.items?.map((item) => (
-                <tr key={item.id}>
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-slate-900">{item.product_name}</div>
-                    <div className="text-indigo-600 font-semibold text-[11px]">{item.variant_name}</div>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-slate-500">{item.sku}</td>
-                  <td className="py-3 px-4 text-right font-medium text-slate-700">
-                    {currency}{Number(item.unit_price).toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4 text-center font-bold text-slate-900">{item.quantity}</td>
-                  <td className="py-3 px-4 text-right font-bold text-slate-900">
-                    {currency}{Number(item.line_total).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Totals Breakdown */}
-        <div className="flex flex-col sm:flex-row justify-between items-start pt-2 gap-6">
-          <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 max-w-sm text-xs space-y-1">
-            <div className="font-bold text-indigo-950">Double-Entry Accounting Verified</div>
-            <p className="text-[11px] text-indigo-800">
-              Automated journal entry posted: Debited Accounts Receivable / Cash, Credited Sales Revenue, and Credited Tax Payable (VAT).
-            </p>
-          </div>
-
-          <div className="w-full sm:w-72 space-y-2 text-xs">
-            <div className="flex justify-between text-slate-600">
-              <span>Subtotal:</span>
-              <span className="font-bold text-slate-900">{currency}{Number(invoice.subtotal).toFixed(2)}</span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Cashier:</span>
+              <span className="font-bold text-slate-800">{invoice.user?.name || 'Cashier Counter'}</span>
             </div>
-            {Number(invoice.discount_amount) > 0 && (
-              <div className="flex justify-between text-rose-600 font-medium">
-                <span>Discount:</span>
-                <span>-{currency}{Number(invoice.discount_amount).toFixed(2)}</span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Customer:</span>
+              <span className="font-bold text-slate-900 truncate max-w-[180px] text-right">{invoice.customer?.name || invoice.customer_name || 'Walk-in Customer'}</span>
+            </div>
+            {(invoice.customer?.phone || invoice.customer_phone) && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Phone:</span>
+                <span className="text-slate-700">{invoice.customer?.phone || invoice.customer_phone}</span>
               </div>
             )}
+          </div>
+
+          <div className="border-t border-dashed border-slate-400 my-1" />
+
+          {/* Line Items Table */}
+          <div>
+            <div className="flex justify-between font-bold text-[9px] pb-0.5 border-b border-dashed border-slate-300 text-slate-500 uppercase">
+              <span>ITEM & SPECIFICATION</span>
+              <span>TOTAL ({currency})</span>
+            </div>
+
+            <div className="divide-y divide-dotted divide-slate-200 py-0.5 space-y-1">
+              {invoice.items?.map((item, idx) => {
+                const name = item.product_name || item.item_name || item.product?.name || 'Product';
+                const variant = item.variant_name || item.variant?.variant_name || '';
+                const sku = item.sku || item.item_sku || item.product_sku || '';
+                const qty = item.quantity || 1;
+                const price = parseFloat(item.unit_price || 0);
+                const total = parseFloat(item.line_total || (qty * price));
+
+                return (
+                  <div key={idx} className="pt-1 first:pt-0 space-y-0.5 text-[10px]">
+                    <div className="flex justify-between items-start gap-1.5">
+                      <div className="font-bold text-slate-900 leading-tight">
+                        {name} {variant && !name.includes(variant) && <span className="font-semibold text-indigo-700">({variant})</span>}
+                      </div>
+                      <div className="font-black text-slate-900 text-right whitespace-nowrap">
+                        {currency}{total.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-[9px] text-slate-500">
+                      <span className="font-mono text-slate-400">{sku ? `SKU: ${sku}` : ''}</span>
+                      <span className="font-medium text-slate-700">{qty} × {currency}{price.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-dashed border-slate-400 my-1" />
+
+          {/* Totals Calculation */}
+          <div className="space-y-0.5 text-[10px] leading-tight">
+            <div className="flex justify-between text-slate-600">
+              <span>SUBTOTAL:</span>
+              <span className="font-bold text-slate-900">{currency}{Number(invoice.subtotal).toFixed(2)}</span>
+            </div>
+
+            {Number(invoice.discount_amount) > 0 && (
+              <div className="flex justify-between text-rose-600">
+                <span>DISCOUNT:</span>
+                <span className="font-bold">-{currency}{Number(invoice.discount_amount).toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="flex justify-between text-slate-600">
               <span>{invoice.tax_rate_name || 'VAT'} ({invoice.tax_rate_percent}%):</span>
               <span className="font-bold text-slate-900">+{currency}{Number(invoice.tax_amount).toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
-              <span className="font-black text-slate-900">Grand Total:</span>
-              <span className="font-black text-xl text-indigo-600">
-                {currency}{Number(invoice.grand_total).toFixed(2)}
-              </span>
+
+            <div className="border-t border-dashed border-slate-400 my-1" />
+
+            <div className="flex justify-between items-center text-xs font-black py-0.5 text-slate-900">
+              <span>TOTAL:</span>
+              <span className="font-mono text-sm">{currency}{Number(invoice.grand_total).toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-slate-600 pt-1">
-              <span>Amount Paid:</span>
-              <span className="font-bold text-emerald-600">{currency}{Number(invoice.paid_amount).toFixed(2)}</span>
+
+            <div className="border-t border-dashed border-slate-400 my-1" />
+
+            <div className="flex justify-between text-slate-600">
+              <span>PAID ({invoice.payment_method?.toUpperCase()}):</span>
+              <span className="font-bold text-emerald-700">{currency}{Number(invoice.paid_amount).toFixed(2)}</span>
             </div>
-            {Number(invoice.due_amount) > 0 && (
+
+            {Number(invoice.due_amount) > 0 ? (
               <div className="flex justify-between text-amber-600 font-bold">
-                <span>Balance Due:</span>
+                <span>DUE:</span>
                 <span>{currency}{Number(invoice.due_amount).toFixed(2)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between text-slate-500">
+                <span>CHANGE:</span>
+                <span>{currency}0.00</span>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Footer Signature & Notes */}
-        <div className="pt-8 border-t border-slate-200 text-center text-xs text-slate-400 space-y-1">
-          <p className="font-semibold text-slate-600">Thank you for your business!</p>
-          <p className="text-[10px]">This is a computer-generated tax invoice and requires no physical seal.</p>
+          <div className="border-t border-dashed border-slate-400 my-1" />
+
+          {/* Real Code128 Linear Barcode */}
+          <div className="py-1 flex justify-center">
+            <BarcodeSvg value={invoice.invoice_number} height={26} showText={true} />
+          </div>
+
+          {/* Footer Notes */}
+          <div className="text-center text-[9px] text-slate-500 pt-0.5 space-y-0.5 font-sans leading-tight">
+            <p className="font-bold text-slate-800">*** Thank You! Please Come Again ***</p>
+            <p>Exchange within 7 days with this POS receipt.</p>
+          </div>
         </div>
       </div>
     </div>

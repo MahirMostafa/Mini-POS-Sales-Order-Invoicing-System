@@ -138,6 +138,38 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function settleDue(Request $request, int $id): JsonResponse
+    {
+        if (!$this->checkPermission('edit-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to settle customer dues.',
+            ], 403);
+        }
+
+        $customer = Customer::findOrFail($id);
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'nullable|string|in:cash,card,bank_transfer',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $settleAmount = (float) $validated['amount'];
+        $currentBalance = (float) $customer->credit_balance;
+        $newBalance = max(0, round($currentBalance - $settleAmount, 2));
+
+        $customer->update(['credit_balance' => $newBalance]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Payment of ৳" . number_format($settleAmount, 2) . " received for customer '{$customer->name}'. Remaining due: ৳" . number_format($newBalance, 2) . ".",
+            'customer' => $customer->fresh(['orders' => function ($q) {
+                $q->latest()->take(10);
+            }, 'invoices']),
+        ]);
+    }
+
     public function destroy(int $id): JsonResponse
     {
         if (!$this->checkPermission('delete-customers', 'manage-customers')) {

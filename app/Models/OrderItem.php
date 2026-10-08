@@ -37,6 +37,12 @@ class OrderItem extends Model
         ];
     }
 
+    protected $appends = [
+        'item_name',
+        'item_sku',
+        'sku',
+    ];
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
@@ -50,5 +56,20 @@ class OrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
+    public function getItemNameAttribute(): string
+    {
+        return $this->variant_name ? "{$this->product_name} ({$this->variant_name})" : $this->product_name;
+    }
+
+    public function getItemSkuAttribute(): ?string
+    {
+        return $this->product_sku;
+    }
+
+    public function getSkuAttribute(): ?string
+    {
+        return $this->product_sku;
     }
 }

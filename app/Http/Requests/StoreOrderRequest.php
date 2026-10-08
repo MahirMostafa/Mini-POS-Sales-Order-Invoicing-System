@@ -21,6 +21,8 @@ class StoreOrderRequest extends FormRequest
             'payment_method' => 'nullable|in:cash,bank_transfer,card,credit',
             'discount_rate' => 'nullable|numeric|min:0|max:100',
             'discount_amount' => 'nullable|numeric|min:0',
+            'discount_type' => 'nullable|in:percent,fixed',
+            'discount_value' => 'nullable|numeric|min:0',
             'paid_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:1000',
             'auto_complete' => 'nullable|boolean',

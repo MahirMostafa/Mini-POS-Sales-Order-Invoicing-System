@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import VariantModal from '../components/VariantModal';
 import QuickCustomerModal from '../components/QuickCustomerModal';
+import PosThermalReceiptModal from '../components/PosThermalReceiptModal';
+import PosPaymentModal from '../components/PosPaymentModal';
+import CustomerSearchSelect from '../components/CustomerSearchSelect';
 
 export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) {
   const [products, setProducts] = useState([]);
@@ -46,9 +49,12 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
   const [orderNotes, setOrderNotes] = useState('');
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Modals
+  // Modals & Receipts
   const [variantModalProduct, setVariantModalProduct] = useState(null);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [company, setCompany] = useState({});
+  const [receiptData, setReceiptData] = useState({ isOpen: false, invoice: null, order: null });
   const [submitting, setSubmitting] = useState(false);
 
   const barcodeInputRef = useRef(null);
@@ -64,6 +70,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         setCustomers(res.data.customers || []);
         setTaxRates(res.data.tax_rates || []);
         setCurrency(res.data.currency || '৳');
+        setCompany(res.data.company || {});
 
         // Set Default Tax Rate (Standard 5% VAT)
         if (res.data.default_tax_rate) {
@@ -274,13 +281,103 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     setOrderNotes('');
   };
 
-  // Create Order Submission (Pending or Completed)
-  const handleCreateOrder = async (isCompleted = false) => {
+  // Step 1: Initiate Checkout (Opens Payment Modal to collect money first)
+  const handleInitiateCheckout = () => {
     if (cartItems.length === 0) {
       Swal.fire({
         icon: 'warning',
         title: 'Empty Cart',
-        text: 'Please select at least one item before submitting order.',
+        text: 'Please select at least one item before proceeding to checkout.',
+      });
+      return;
+    }
+
+    if (!selectedCustomer) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Customer Required',
+        text: 'Please choose or create a customer for this sale.',
+      });
+      return;
+    }
+
+    setIsPaymentModalOpen(true);
+  };
+
+  // Step 2: Confirm Payment & Complete Sale (Takes money, posts double-entry journal, deducts stock, and opens 80mm receipt)
+  const handleConfirmPaymentAndComplete = async (paymentData) => {
+    setSubmitting(true);
+    try {
+      const calculatedDiscountAmount = discountType === 'percent'
+        ? ((subtotal * (Number(discountValue) || 0)) / 100)
+        : (Number(discountValue) || 0);
+
+      const payload = {
+        customer_id: selectedCustomer.id,
+        tax_rate_id: selectedTaxRate?.id || null,
+        discount_rate: discountType === 'percent' ? (Number(discountValue) || 0) : 0,
+        discount_amount: calculatedDiscountAmount,
+        discount_type: discountType,
+        discount_value: Number(discountValue) || 0,
+        paid_amount: paymentData.paid_amount,
+        notes: orderNotes,
+        order_date: orderDate,
+        payment_method: paymentData.payment_method || 'cash',
+        items: cartItems.map((item) => ({
+          product_id: item.product_id,
+          product_variant_id: item.product_variant_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount: item.discount_amount || 0,
+        })),
+      };
+
+      // 1. Create the order
+      const orderRes = await api.post('/orders', payload);
+      const createdOrder = orderRes.data.order;
+
+      // 2. Complete order with collected payment
+      const completeRes = await api.post(`/orders/${createdOrder.id}/complete`, {
+        paid_amount: paymentData.paid_amount,
+        payment_method: paymentData.payment_method,
+        payment_note: paymentData.payment_note || 'POS Counter Payment',
+      });
+
+      const invoice = completeRes.data.invoice;
+      const completedOrder = completeRes.data.order || createdOrder;
+
+      // Close payment modal
+      setIsPaymentModalOpen(false);
+
+      // Reset cart and reload live inventory
+      handleResetCart();
+      loadPosData();
+
+      // Launch Instant 80mm POS Thermal Receipt Modal
+      setReceiptData({
+        isOpen: true,
+        invoice: invoice,
+        order: completedOrder,
+      });
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Checkout Failed',
+        text: err.response?.data?.message || 'Failed to complete transaction. Please check stock and details.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Save Order as Pending (without taking payment or deducting stock)
+  const handleSavePendingOrder = async () => {
+    if (cartItems.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Empty Cart',
+        text: 'Please select at least one item before saving order.',
       });
       return;
     }
@@ -296,9 +393,15 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
 
     setSubmitting(true);
     try {
+      const calculatedDiscountAmount = discountType === 'percent'
+        ? ((subtotal * (Number(discountValue) || 0)) / 100)
+        : (Number(discountValue) || 0);
+
       const payload = {
         customer_id: selectedCustomer.id,
         tax_rate_id: selectedTaxRate?.id || null,
+        discount_rate: discountType === 'percent' ? (Number(discountValue) || 0) : 0,
+        discount_amount: calculatedDiscountAmount,
         discount_type: discountType,
         discount_value: Number(discountValue) || 0,
         notes: orderNotes,
@@ -308,67 +411,36 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
           product_variant_id: item.product_variant_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
-          discount_amount: item.discount_amount || 0,
+          discount: item.discount_amount || 0,
         })),
       };
 
-      // 1. Create the order
       const orderRes = await api.post('/orders', payload);
       const createdOrder = orderRes.data.order;
 
-      if (!isCompleted) {
-        // Created as PENDING
-        Swal.fire({
-          icon: 'success',
-          title: 'Order Created (Pending)',
-          text: `Sales Order #${createdOrder.order_number} saved as PENDING. Stock is NOT yet deducted.`,
-          showCancelButton: true,
-          confirmButtonColor: '#4f46e5',
-          cancelButtonColor: '#64748b',
-          confirmButtonText: 'View Order Details',
-          cancelButtonText: 'New Sale',
-        }).then((result) => {
-          handleResetCart();
-          loadPosData();
-          if (result.isConfirmed && onNavigateToOrder) {
-            onNavigateToOrder(createdOrder.id);
-          }
-        });
-      } else {
-        // Immediately Complete & Invoice
-        const completeRes = await api.post(`/orders/${createdOrder.id}/complete`, {
-          payment_method: 'cash',
-          payment_note: 'Immediate POS counter checkout',
-        });
-
-        const invoice = completeRes.data.invoice;
-
-        Swal.fire({
-          icon: 'success',
-          title: 'Sale Completed & Invoiced!',
-          html: `
-            <div class="text-left space-y-2 text-xs text-slate-700">
-              <p><b>Order:</b> ${createdOrder.order_number}</p>
-              <p><b>Invoice:</b> <span class="text-indigo-600 font-bold">${invoice.invoice_number}</span></p>
-              <p><b>Double-Entry Accounting:</b> Balanced Journal Posted (AR, Sales Revenue, Tax Payable, COGS, Inventory)</p>
-              <p><b>Stock:</b> Deducted atomicaly from inventory.</p>
-            </div>
-          `,
-          showCancelButton: true,
-          confirmButtonColor: '#4f46e5',
-          cancelButtonColor: '#10b981',
-          confirmButtonText: 'Print / View Invoice',
-          cancelButtonText: 'New POS Sale',
-        }).then((result) => {
-          handleResetCart();
-          loadPosData();
-          if (result.isConfirmed && onNavigateToInvoice) {
-            onNavigateToInvoice(invoice.id);
-          }
-        });
-      }
+      Swal.fire({
+        icon: 'success',
+        title: 'Order Saved (Pending)',
+        text: `Sales Order #${createdOrder.order_number} saved as PENDING. Stock is NOT yet deducted.`,
+        showCancelButton: true,
+        confirmButtonColor: '#4f46e5',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'View Order Details',
+        cancelButtonText: 'New Sale',
+      }).then((result) => {
+        handleResetCart();
+        loadPosData();
+        if (result.isConfirmed && onNavigateToOrder) {
+          onNavigateToOrder(createdOrder.id);
+        }
+      });
     } catch (err) {
       console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error Saving Order',
+        text: err.response?.data?.message || 'Failed to save pending order.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -554,34 +626,13 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                 )}
               </div>
 
-              {/* Customer Selector Dropdown + Quick Add */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <select
-                    value={selectedCustomer?.id || ''}
-                    onChange={(e) => {
-                      const cust = customers.find((c) => c.id === Number(e.target.value));
-                      setSelectedCustomer(cust || null);
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
-                  >
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.phone || c.customer_code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowCustomerModal(true)}
-                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
-                  title="Create new customer profile"
-                >
-                  <UserPlus className="w-4 h-4" />
-                </button>
-              </div>
+              {/* Searchable Customer Selector + Quick Add */}
+              <CustomerSearchSelect
+                customers={customers}
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={(cust) => setSelectedCustomer(cust)}
+                onOpenNewCustomerModal={() => setShowCustomerModal(true)}
+              />
             </div>
 
             {/* Cart Line Items Table */}
@@ -722,21 +773,21 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
               <button
                 type="button"
                 disabled={submitting || cartItems.length === 0}
-                onClick={() => handleCreateOrder(false)}
+                onClick={handleSavePendingOrder}
                 className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs disabled:opacity-40 transition-all shadow-xs"
               >
                 <Clock className="w-3.5 h-3.5 text-amber-500" />
-                <span>Save Pending Order</span>
+                <span>Save Pending</span>
               </button>
 
               <button
                 type="button"
                 disabled={submitting || cartItems.length === 0}
-                onClick={() => handleCreateOrder(true)}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-40 transition-all"
+                onClick={handleInitiateCheckout}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-40 transition-all"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Complete & Invoice</span>
+                <span>Pay & Print ({currency}{grandTotal.toFixed(2)})</span>
               </button>
             </div>
           </div>
@@ -765,6 +816,31 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
           }}
         />
       )}
+
+      {/* POS Tender / Payment Modal (Takes money & calculates change before invoice) */}
+      <PosPaymentModal
+        isOpen={isPaymentModalOpen}
+        grandTotal={grandTotal}
+        subtotal={subtotal}
+        taxAmount={taxAmount}
+        discountAmount={discountAmount}
+        customer={selectedCustomer}
+        itemCount={cartItems.reduce((s, i) => s + i.quantity, 0)}
+        currency={currency}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onConfirmPayment={handleConfirmPaymentAndComplete}
+        submitting={submitting}
+      />
+
+      {/* POS 80mm Thermal Receipt Modal */}
+      <PosThermalReceiptModal
+        isOpen={receiptData.isOpen}
+        invoice={receiptData.invoice}
+        order={receiptData.order}
+        company={company}
+        onClose={() => setReceiptData({ isOpen: false, invoice: null, order: null })}
+        onNewSale={() => setReceiptData({ isOpen: false, invoice: null, order: null })}
+      />
     </div>
   );
 }

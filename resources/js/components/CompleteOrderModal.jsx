@@ -8,6 +8,15 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
   const [paymentMethod, setPaymentMethod] = useState(order.payment_method || 'cash');
   const [paidAmount, setPaidAmount] = useState(grandTotal);
 
+  const isWalkIn = Boolean(
+    !order.customer ||
+    order.customer.customer_code === 'CUST-0001' ||
+    order.customer.id === 1 ||
+    order.customer.name?.toLowerCase().includes('walk-in') ||
+    order.customer.name?.toLowerCase().includes('walk in') ||
+    order.customer.name?.toLowerCase().includes('cash customer')
+  );
+
   const changeAmount = Math.max(0, Number(paidAmount || 0) - grandTotal);
   const dueAmount = Math.max(0, grandTotal - Number(paidAmount || 0));
 
@@ -21,6 +30,11 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (isWalkIn && (paymentMethod === 'credit' || Number(paidAmount) < grandTotal)) {
+      alert(`Credit / Due sales are not permitted for Walk-in Customers. Full payment of ${currency}${grandTotal.toFixed(2)} is required.`);
+      return;
+    }
+
     onConfirm({
       paid_amount: Number(paidAmount),
       payment_method: paymentMethod,
@@ -73,17 +87,23 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
                 { id: 'cash', label: 'Cash', icon: Banknote },
                 { id: 'card', label: 'POS Card', icon: CreditCard },
                 { id: 'bank_transfer', label: 'Bank', icon: Building },
-                { id: 'credit', label: 'Credit', icon: Clock },
+                { id: 'credit', label: isWalkIn ? 'No Credit' : 'Credit', icon: Clock, disabled: isWalkIn },
               ].map((method) => {
                 const Icon = method.icon;
                 const isSelected = paymentMethod === method.id;
+                const isDisabled = method.disabled;
                 return (
                   <button
                     type="button"
                     key={method.id}
-                    onClick={() => setPaymentMethod(method.id)}
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (!isDisabled) setPaymentMethod(method.id);
+                    }}
                     className={`p-2.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
-                      isSelected
+                      isDisabled
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                        : isSelected
                         ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold shadow-xs'
                         : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
@@ -118,7 +138,11 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
                 min="0"
                 value={paidAmount}
                 onChange={(e) => setPaidAmount(e.target.value)}
-                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-slate-300 text-slate-900 font-bold text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                className={`w-full pl-8 pr-4 py-2.5 rounded-xl border text-slate-900 font-bold text-base focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
+                  isWalkIn && dueAmount > 0
+                    ? 'border-rose-300 focus:border-rose-500'
+                    : 'border-slate-300 focus:border-indigo-600'
+                }`}
               />
             </div>
 
@@ -146,8 +170,10 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
               </div>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-[11px] font-medium text-slate-500">Accounts Receivable (Due)</div>
-              <div className={`text-base font-black ${dueAmount > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+              <div className="text-[11px] font-medium text-slate-500">
+                {isWalkIn ? 'Unpaid Balance (Blocked)' : 'Accounts Receivable (Due)'}
+              </div>
+              <div className={`text-base font-black ${dueAmount > 0 ? (isWalkIn ? 'text-rose-600' : 'text-amber-600') : 'text-slate-400'}`}>
                 {currency}{dueAmount.toFixed(2)}
               </div>
             </div>
@@ -172,11 +198,15 @@ export default function CompleteOrderModal({ order, currency = '৳', onClose, o
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-md shadow-emerald-600/20"
+              disabled={loading || (isWalkIn && dueAmount > 0)}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md ${
+                isWalkIn && dueAmount > 0
+                  ? 'bg-slate-400 text-white cursor-not-allowed opacity-60'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+              }`}
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Confirm & Complete Sale
+              {isWalkIn && dueAmount > 0 ? 'Full Payment Required' : 'Confirm & Complete Sale'}
             </button>
           </div>
         </form>

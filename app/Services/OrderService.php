@@ -78,8 +78,20 @@ class OrderService implements OrderServiceInterface
             // 3. Compute Overall Discounts, Tax, and Grand Total
             $discountRate = (float) ($data['discount_rate'] ?? 0.00);
             $orderDiscount = (float) ($data['discount_amount'] ?? 0.00);
-            if ($discountRate > 0 && $orderDiscount == 0) {
+
+            if (!empty($data['discount_type']) && isset($data['discount_value'])) {
+                $discVal = (float) $data['discount_value'];
+                if ($data['discount_type'] === 'percent') {
+                    $discountRate = $discVal;
+                    $orderDiscount = round($subtotal * ($discVal / 100), 2);
+                } else {
+                    $orderDiscount = min($subtotal, $discVal);
+                    $discountRate = $subtotal > 0 ? round(($orderDiscount / $subtotal) * 100, 2) : 0.00;
+                }
+            } elseif ($discountRate > 0 && $orderDiscount == 0) {
                 $orderDiscount = round($subtotal * ($discountRate / 100), 2);
+            } elseif ($orderDiscount > 0 && $discountRate == 0 && $subtotal > 0) {
+                $discountRate = round(($orderDiscount / $subtotal) * 100, 2);
             }
 
             $taxableAmount = max(0, $subtotal - $orderDiscount);
@@ -88,6 +100,15 @@ class OrderService implements OrderServiceInterface
 
             $paidAmount = min($grandTotal, max(0, (float) ($data['paid_amount'] ?? 0.00)));
             $changeAmount = max(0, (float) ($data['paid_amount'] ?? 0.00) - $grandTotal);
+
+            // Disallow credit/due sales to Walk-in Customers
+            $paymentMethod = $data['payment_method'] ?? 'cash';
+            $isExplicitCredit = $paymentMethod === 'credit';
+            $isAutoCompleteUnderpaid = !empty($data['auto_complete']) && ($paidAmount < $grandTotal);
+
+            if (($isExplicitCredit || $isAutoCompleteUnderpaid) && $this->isWalkInCustomer((int) ($data['customer_id'] ?? 0))) {
+                throw new InvalidArgumentException("Credit / Due sales are not permitted for Walk-in Customers. Please collect full payment or select a registered customer profile.");
+            }
 
             $paymentStatus = 'unpaid';
             if ($paidAmount >= $grandTotal && $grandTotal > 0) {
@@ -104,7 +125,7 @@ class OrderService implements OrderServiceInterface
                 'due_date' => $data['due_date'] ?? null,
                 'status' => 'pending', // Stock is NOT deducted in pending state
                 'payment_status' => $paymentStatus,
-                'payment_method' => $data['payment_method'] ?? 'cash',
+                'payment_method' => $paymentMethod,
                 'subtotal' => $subtotal,
                 'discount_rate' => $discountRate,
                 'discount_amount' => $orderDiscount,
@@ -201,22 +222,37 @@ class OrderService implements OrderServiceInterface
             ];
         }
 
+        // 2. Disallow Credit/Due for Walk-in Customers
+        $finalPaid = $paidAmount !== null ? $paidAmount : (float) $order->paid_amount;
+        $finalMethod = $paymentMethod ?: $order->payment_method;
+        $dueAmountCheck = max(0, round((float) $order->grand_total - $finalPaid, 2));
+
+        if (($dueAmountCheck > 0 || $finalMethod === 'credit') && $this->isWalkInCustomer($order->customer_id, $order->customer)) {
+            return [
+                'success' => false,
+                'message' => "Credit / Due sales are not permitted for Walk-in Customers. Please collect the full payment of ৳" . number_format((float) $order->grand_total, 2) . " or select a registered customer profile.",
+            ];
+        }
+
         try {
             DB::beginTransaction();
 
             $userId = auth()->id() ?? $order->user_id;
 
-            // 2. Deduct Live Stock & Record Movement Logs
+            // 3. Deduct Live Stock & Record Movement Logs
             $this->inventoryService->deductOrderStock($order, $userId);
 
-            // 3. Update Order Status
+            // 3. Update Order Status & Financials
             $paymentStatus = $order->payment_status;
             if ($paidAmount !== null) {
                 $order->paid_amount = $paidAmount;
+                $order->change_amount = $paidAmount > (float) $order->grand_total ? round($paidAmount - (float) $order->grand_total, 2) : 0.00;
                 if ($paidAmount >= (float) $order->grand_total && (float) $order->grand_total > 0) {
                     $paymentStatus = 'paid';
                 } elseif ($paidAmount > 0) {
                     $paymentStatus = 'partially_paid';
+                } else {
+                    $paymentStatus = 'unpaid';
                 }
             }
             if ($paymentMethod) {
@@ -225,6 +261,12 @@ class OrderService implements OrderServiceInterface
 
             $this->orderRepo->updateStatus($order, 'completed', $paymentStatus);
             $order->save();
+
+            // Track Customer Credit / Due Balance
+            $dueAmount = max(0, round((float) $order->grand_total - (float) $order->paid_amount, 2));
+            if ($dueAmount > 0 && $order->customer_id) {
+                $order->customer()->increment('credit_balance', $dueAmount);
+            }
 
             // 4. Generate Formal Invoice
             $invoice = $this->invoiceService->generateFromOrder($order);
@@ -252,8 +294,8 @@ class OrderService implements OrderServiceInterface
             return [
                 'success' => true,
                 'message' => "Order #{$order->order_number} completed successfully. Stock deducted, Invoice #{$invoice->invoice_number} generated, and Double-Entry Ledger posted.",
-                'order' => $order->fresh(['invoice', 'items.variant.product']),
-                'invoice' => $invoice,
+                'order' => $order->fresh(['customer', 'user', 'invoice', 'items.variant.product', 'taxRate']),
+                'invoice' => $invoice->load(['customer', 'user', 'items', 'order.customer']),
                 'journal_entry' => $journalEntry,
             ];
         } catch (Exception $e) {
@@ -284,5 +326,24 @@ class OrderService implements OrderServiceInterface
         );
 
         return true;
+    }
+
+    public function isWalkInCustomer(?int $customerId, ?\App\Models\Customer $customer = null): bool
+    {
+        if (!$customerId && !$customer) {
+            return true;
+        }
+
+        $cust = $customer ?: \App\Models\Customer::find($customerId);
+        if (!$cust) {
+            return true;
+        }
+
+        if ($cust->customer_code === 'CUST-0001' || $cust->id === 1) {
+            return true;
+        }
+
+        $name = strtolower($cust->name);
+        return str_contains($name, 'walk-in') || str_contains($name, 'walk in') || str_contains($name, 'cash customer');
     }
 }

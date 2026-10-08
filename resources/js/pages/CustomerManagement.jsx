@@ -57,6 +57,13 @@ export default function CustomerManagement() {
   const [viewingCustomer, setViewingCustomer] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Settle Due Modal
+  const [settleCustomer, setSettleCustomer] = useState(null);
+  const [settleAmount, setSettleAmount] = useState('');
+  const [settleMethod, setSettleMethod] = useState('cash');
+  const [settleNote, setSettleNote] = useState('');
+  const [submittingSettle, setSubmittingSettle] = useState(false);
+
   const fetchCustomers = async (page = 1) => {
     setLoading(true);
     try {
@@ -200,6 +207,57 @@ export default function CustomerManagement() {
       Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load customer details.' });
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleOpenSettleModal = (cust) => {
+    setSettleCustomer(cust);
+    setSettleAmount(parseFloat(cust.credit_balance || 0).toFixed(2));
+    setSettleMethod('cash');
+    setSettleNote('');
+  };
+
+  const handleSaveSettlePayment = async (e) => {
+    e.preventDefault();
+    if (!settleCustomer) return;
+    const numAmount = parseFloat(settleAmount) || 0;
+    if (numAmount <= 0) {
+      Swal.fire({ icon: 'warning', title: 'Invalid Amount', text: 'Please enter a valid payment amount.' });
+      return;
+    }
+
+    setSubmittingSettle(true);
+    try {
+      const res = await api.post(`/customers/${settleCustomer.id}/settle-due`, {
+        amount: numAmount,
+        payment_method: settleMethod,
+        note: settleNote,
+      });
+
+      if (res.data.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Payment Received',
+          text: res.data.message,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+
+        setSettleCustomer(null);
+        if (viewingCustomer && viewingCustomer.id === settleCustomer.id) {
+          setViewingCustomer(res.data.customer);
+        }
+        fetchCustomers(pagination.current_page || 1);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Settlement Failed',
+        text: err.response?.data?.message || 'Could not record customer payment.',
+      });
+    } finally {
+      setSubmittingSettle(false);
     }
   };
 
@@ -384,18 +442,39 @@ export default function CustomerManagement() {
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Credit Balance</span>
-                  <span className="font-black text-slate-900">৳{parseFloat(c.credit_balance || 0).toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Credit / Due Balance</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`font-black text-sm ${parseFloat(c.credit_balance || 0) > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+                      ৳{parseFloat(c.credit_balance || 0).toFixed(2)}
+                    </span>
+                    {parseFloat(c.credit_balance || 0) > 0 && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                        Due
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleViewCustomerDetails(c)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 font-bold text-xs transition-colors"
-                >
-                  <ShoppingBag className="w-3.5 h-3.5" />
-                  <span>{c.orders_count || 0} Order(s)</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {parseFloat(c.credit_balance || 0) > 0 && canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenSettleModal(c)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 transition-colors"
+                      title="Settle Due Payment"
+                    >
+                      <span>Settle</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleViewCustomerDetails(c)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 font-bold text-xs transition-colors"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>{c.orders_count || 0}</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -576,19 +655,19 @@ export default function CustomerManagement() {
 
       {/* Customer Orders & Invoices History Drawer Modal */}
       {viewingCustomer && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150 my-4">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
-                  <ShoppingBag className="w-4 h-4" />
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                  <ShoppingBag className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">
-                    Order History: {viewingCustomer.name}
+                    Customer Ledger & History: {viewingCustomer.name}
                   </h3>
-                  <p className="text-[10px] text-slate-400">
-                    Customer Code: {viewingCustomer.customer_code} • {viewingCustomer.phone || 'No phone'}
+                  <p className="text-[11px] text-slate-500">
+                    Code: <span className="font-mono font-bold text-slate-700">{viewingCustomer.customer_code}</span> • {viewingCustomer.phone || 'No phone'}
                   </p>
                 </div>
               </div>
@@ -601,57 +680,207 @@ export default function CustomerManagement() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-indigo-600" />
-                <span>Recent Orders & Invoices</span>
-              </h4>
-
-              {viewingCustomer.orders?.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl text-xs">
-                  No sales orders found for this customer yet.
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
+              {/* Credit / Due Balance Top Summary Box */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+                    Outstanding Credit / Due Balance
+                  </span>
+                  <div className="text-2xl font-black text-amber-700">
+                    ৳{parseFloat(viewingCustomer.credit_balance || 0).toFixed(2)}
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-2.5">
-                  {viewingCustomer.orders?.map((ord) => (
-                    <div
-                      key={ord.id}
-                      className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div>
-                        <div className="font-bold text-slate-900">{ord.order_number}</div>
-                        <div className="text-[10px] text-slate-400">
-                          {new Date(ord.created_at).toLocaleDateString()} • {ord.payment_method?.toUpperCase()}
-                        </div>
-                      </div>
 
-                      <div className="text-right">
-                        <div className="font-black text-slate-900">৳{parseFloat(ord.total_amount || 0).toFixed(2)}</div>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            ord.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
+                {parseFloat(viewingCustomer.credit_balance || 0) > 0 && canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSettleModal(viewingCustomer)}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition-all flex items-center gap-1.5"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Receive / Settle Due Payment</span>
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 mb-3">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <span>Recent Sales Orders ({viewingCustomer.orders?.length || 0})</span>
+                </h4>
+
+                {(!viewingCustomer.orders || viewingCustomer.orders.length === 0) ? (
+                  <div className="py-10 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl text-xs">
+                    No sales orders found for this customer yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {viewingCustomer.orders.map((ord) => {
+                      const grandTotal = parseFloat(ord.grand_total || ord.total_amount || 0);
+                      const paidAmount = parseFloat(ord.paid_amount || 0);
+                      const dueAmount = Math.max(0, grandTotal - paidAmount);
+
+                      return (
+                        <div
+                          key={ord.id}
+                          className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
                         >
-                          {ord.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 font-mono">{ord.order_number}</span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase bg-slate-200 text-slate-700">
+                                {ord.payment_method || 'CASH'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {new Date(ord.created_at).toLocaleDateString()} at {new Date(ord.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-4 text-right">
+                            <div>
+                              <div className="font-black text-slate-900">৳{grandTotal.toFixed(2)}</div>
+                              <div className="text-[10px] text-slate-500">
+                                Paid: <span className="font-bold text-emerald-600">৳{paidAmount.toFixed(2)}</span>
+                                {dueAmount > 0 && (
+                                  <span className="text-amber-700 ml-1 font-bold">• Due: ৳{dueAmount.toFixed(2)}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-1">
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                                  ord.payment_status === 'paid'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : ord.payment_status === 'partially_paid'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {ord.payment_status || 'unpaid'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
               <button
                 type="button"
                 onClick={() => setViewingCustomer(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-200 hover:bg-slate-300 text-slate-700"
               >
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settle Customer Due Modal */}
+      {settleCustomer && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Receive Customer Due Payment</h3>
+                  <p className="text-[10px] text-slate-500">{settleCustomer.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettleCustomer(null)}
+                disabled={submittingSettle}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSettlePayment} className="p-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="text-slate-500 text-[10px] font-bold uppercase">Current Outstanding Balance</div>
+                <div className="text-xl font-black text-amber-600">
+                  ৳{parseFloat(settleCustomer.credit_balance || 0).toFixed(2)}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Payment Amount Received (৳) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={parseFloat(settleCustomer.credit_balance || 0) || undefined}
+                  required
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method</label>
+                <select
+                  value={settleMethod}
+                  onChange={(e) => setSettleMethod(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                >
+                  <option value="cash">Cash in Hand</option>
+                  <option value="card">Card / POS</option>
+                  <option value="bank_transfer">Bank / Digital Transfer</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Receipt Ref (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Cleared via Cash counter"
+                  value={settleNote}
+                  onChange={(e) => setSettleNote(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSettleCustomer(null)}
+                  disabled={submittingSettle}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingSettle}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/20 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {submittingSettle ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Recording...</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Receive Payment</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
