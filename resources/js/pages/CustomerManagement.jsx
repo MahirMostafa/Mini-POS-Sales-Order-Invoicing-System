@@ -23,13 +23,20 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function CustomerManagement() {
+  const { user, role, hasPermission } = useAuth();
   const [customers, setCustomers] = useState([]);
   const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0, per_page: 12 });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+
+  // Granular Spatie Permission checks
+  const canCreate = hasPermission(['create-customers', 'manage-customers']);
+  const canEdit = hasPermission(['edit-customers', 'manage-customers']);
+  const canDelete = hasPermission(['delete-customers', 'manage-customers']);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -214,14 +221,16 @@ export default function CustomerManagement() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenAddModal}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Add New Customer</span>
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Add New Customer</span>
+          </button>
+        )}
       </div>
 
       {/* Summary KPI Cards */}
@@ -319,22 +328,26 @@ export default function CustomerManagement() {
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditModal(c)}
-                      className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      title="Edit Customer"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCustomer(c)}
-                      className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      title="Delete Customer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(c)}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        title="Edit Customer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCustomer(c)}
+                        className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Delete Customer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

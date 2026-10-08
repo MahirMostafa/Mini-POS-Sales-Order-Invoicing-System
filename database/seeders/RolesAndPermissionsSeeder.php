@@ -23,6 +23,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'print-invoices',
             'manage-products',
             'manage-purchases',
+            'view-customers',
+            'create-customers',
+            'edit-customers',
+            'delete-customers',
             'manage-customers',
             'manage-tax-rates',
             'view-accounting-dashboard',
@@ -42,7 +46,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
         $adminRole->syncPermissions(Permission::all());
 
-        // 2. Cashier Role (POS, Orders, Invoices, Customers)
+        // 2. Cashier Role (POS, Orders, Invoices, Customer View/Create/Edit, but CANNOT delete customers)
         $cashierRole = Role::firstOrCreate(['name' => 'Cashier', 'guard_name' => 'web']);
         $cashierRole->syncPermissions([
             'view-pos',
@@ -51,14 +55,18 @@ class RolesAndPermissionsSeeder extends Seeder
             'cancel-order',
             'view-invoices',
             'print-invoices',
+            'view-customers',
+            'create-customers',
+            'edit-customers',
             'manage-customers',
         ]);
 
-        // 3. Accountant Role (Accounting Dashboard, Ledger, Journal Entries, Invoices, Tax Rates, Audit Logs)
+        // 3. Accountant Role (Accounting Dashboard, Ledger, Journal Entries, Invoices, Customer View, Tax Rates, Audit Logs)
         $accountantRole = Role::firstOrCreate(['name' => 'Accountant', 'guard_name' => 'web']);
         $accountantRole->syncPermissions([
             'view-invoices',
             'print-invoices',
+            'view-customers',
             'view-accounting-dashboard',
             'view-ledger',
             'view-journal-entries',

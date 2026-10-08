@@ -103,18 +103,45 @@ export default function RolePermissionManagement() {
     }
   };
 
+  const permissionMeta = {
+    'view-pos': { title: 'Access POS Terminal', desc: 'Can open the POS counter and search live product catalog' },
+    'create-order': { title: 'Create Sales Orders', desc: 'Can create draft/pending sales orders and add cart items' },
+    'complete-order': { title: 'Complete Sales Orders', desc: 'Can confirm checkout, trigger stock deduction & post double-entry' },
+    'cancel-order': { title: 'Cancel Sales Orders', desc: 'Can cancel pending orders and release reserved stock' },
+    'view-invoices': { title: 'View Invoices & Receipts', desc: 'Can access invoices list and view thermal receipt previews' },
+    'print-invoices': { title: 'Print & Export Invoices', desc: 'Can print invoices and download billing receipts' },
+    'view-customers': { title: 'View Customer Directory', desc: 'Can view customer profiles, contact info & order histories' },
+    'create-customers': { title: 'Create New Customers', desc: 'Can register new customer profiles and credit limits' },
+    'edit-customers': { title: 'Edit Customer Profiles', desc: 'Can update customer contact details, addresses and tax numbers' },
+    'delete-customers': { title: 'Delete Customers', desc: 'Can delete customers that have no prior sales/invoice history' },
+    'manage-customers': { title: 'Manage All Customer Data', desc: 'Super permission covering all customer operations' },
+    'manage-products': { title: 'Manage Products & Variants', desc: 'Can create, edit, delete products, variants, SKUs and barcodes' },
+    'manage-purchases': { title: 'Manage Supplier Purchases', desc: 'Can record purchase orders, supplier costs and replenish inventory' },
+    'manage-tax-rates': { title: 'Manage VAT & Tax Rates', desc: 'Can create and configure dynamic tax rates and default tax rule' },
+    'view-accounting-dashboard': { title: 'View Accounting Dashboard', desc: 'Can inspect Revenue, COGS, Gross Margin & Profit summaries' },
+    'view-ledger': { title: 'View General Ledger', desc: 'Can inspect individual Account statement ledgers and running balances' },
+    'view-journal-entries': { title: 'View Journal Entries', desc: 'Can view double-entry debit and credit accounting transaction logs' },
+    'manage-users': { title: 'Manage System Users', desc: 'Can create staff accounts, assign passwords and assign roles' },
+    'manage-roles': { title: 'Manage Roles & Permissions', desc: 'Can configure Spatie permission matrices for roles' },
+    'view-audit-logs': { title: 'View Audit Activity Logs', desc: 'Can inspect background queue audit logs and critical changes' },
+    'manage-settings': { title: 'Manage Store Settings', desc: 'Can adjust store currency, receipt layout and business details' },
+  };
+
   // Group permissions logically
   const getPermissionGroup = (name) => {
-    if (name.includes('pos') || name.includes('order') || name.includes('invoice') || name.includes('customer')) {
-      return 'POS, Sales & Customer Orders';
+    if (name.includes('customer')) {
+      return 'Customer Management & CRM';
+    }
+    if (name.includes('pos') || name.includes('order') || name.includes('invoice')) {
+      return 'POS, Sales & Billing';
     }
     if (name.includes('product') || name.includes('purchase')) {
-      return 'Inventory & Purchase Inflows';
+      return 'Inventory & Supplier Purchases';
     }
     if (name.includes('accounting') || name.includes('ledger') || name.includes('journal') || name.includes('tax')) {
       return 'Double-Entry Accounting & Taxes';
     }
-    return 'Security & User Administration';
+    return 'Administration & Security';
   };
 
   const groupedPermissions = permissions.reduce((acc, perm) => {
@@ -135,7 +162,7 @@ export default function RolePermissionManagement() {
           </div>
           <h2 className="text-xl font-black text-slate-900">Role & Permission Access Control</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure atomic route and module permissions for Admin, Cashier, and Accountant roles.
+            Configure atomic permissions for Customer Editing, Customer Deletion, POS Terminal, Inventory, and Accounting.
           </p>
         </div>
 
@@ -191,8 +218,8 @@ export default function RolePermissionManagement() {
 
               <div className="font-black text-slate-900 text-sm mb-0.5">{r.name}</div>
               <p className="text-[11px] text-slate-500 line-clamp-2">
-                {r.name === 'Admin' && 'Unrestricted access to all terminal, inventory, user, and accounting modules.'}
-                {r.name === 'Cashier' && 'Access to POS checkout terminal, sales orders, invoicing, and customer records.'}
+                {r.name === 'Admin' && 'Unrestricted access to all terminal, inventory, user, customer, and accounting modules.'}
+                {r.name === 'Cashier' && 'Access to POS checkout terminal, sales orders, customer creation & editing (delete restricted).'}
                 {r.name === 'Accountant' && 'Access to Double-Entry General Ledger, Journal, Tax configuration, and Financials.'}
               </p>
             </button>
@@ -210,7 +237,7 @@ export default function RolePermissionManagement() {
                 Configuring Permissions for: <span className="text-indigo-600 font-black">{selectedRole.name}</span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                Check or uncheck the modules this role is authorized to perform.
+                Check or uncheck specific atomic permissions for this role.
               </p>
             </div>
 
@@ -243,26 +270,39 @@ export default function RolePermissionManagement() {
                 <div className="space-y-2">
                   {perms.map((p) => {
                     const isChecked = selectedPermissions.includes(p.name);
+                    const meta = permissionMeta[p.name] || { title: p.name, desc: p.name };
                     return (
                       <label
                         key={p.id}
-                        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                        className={`flex items-start justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
                           isChecked
                             ? 'bg-white border-indigo-400 text-slate-900 shadow-xs'
                             : 'bg-white/60 border-slate-200 text-slate-500 hover:bg-white'
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-start gap-3">
                           <input
                             type="checkbox"
                             checked={isChecked}
                             onChange={() => handleTogglePermission(p.name)}
-                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 mt-0.5 shrink-0"
                           />
-                          <span className="font-semibold">{p.name}</span>
+                          <div>
+                            <div className="font-bold text-slate-900">{meta.title}</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">{meta.desc}</div>
+                            <div className="text-[10px] font-mono text-indigo-600 mt-0.5">{p.name}</div>
+                          </div>
                         </div>
 
-                        <span className="text-[10px] text-slate-400 font-mono">web</span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                            isChecked
+                              ? 'bg-indigo-100 text-indigo-800'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isChecked ? 'Allowed' : 'Denied'}
+                        </span>
                       </label>
                     );
                   })}

@@ -153,7 +153,10 @@ function DashboardLayout() {
             <Route
               path="/customers"
               element={
-                <ProtectedRoute allowedRoles={['Admin', 'Cashier']} requiredPermissions={['manage-customers']}>
+                <ProtectedRoute
+                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
+                  requiredPermissions={['view-customers', 'manage-customers']}
+                >
                   <CustomerManagement />
                 </ProtectedRoute>
               }

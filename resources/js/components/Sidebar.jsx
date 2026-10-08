@@ -55,8 +55,8 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           path: '/customers',
           label: 'Manage Customers',
           icon: Users,
-          roles: ['Admin', 'Cashier'],
-          permissions: ['manage-customers']
+          roles: ['Admin', 'Cashier', 'Accountant'],
+          permissions: ['view-customers', 'manage-customers']
         }
       ]
     },

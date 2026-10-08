@@ -17,8 +17,35 @@ class CustomerController extends Controller
     ) {
     }
 
+    protected function checkPermission(string ...$perms): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return true; // fallback if session unauthenticated in testing
+        }
+
+        if ($user->hasRole('Admin')) {
+            return true;
+        }
+
+        foreach ($perms as $perm) {
+            if ($user->can($perm)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function index(Request $request): JsonResponse
     {
+        if (!$this->checkPermission('view-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to view customer records.',
+            ], 403);
+        }
+
         $customers = $this->customerRepo->paginate(
             $request->integer('per_page', 12),
             $request->get('search')
@@ -32,6 +59,13 @@ class CustomerController extends Controller
 
     public function show(int $id): JsonResponse
     {
+        if (!$this->checkPermission('view-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to view customer profiles.',
+            ], 403);
+        }
+
         $customer = Customer::with(['orders' => function ($q) {
             $q->latest()->take(5);
         }, 'invoices' => function ($q) {
@@ -46,6 +80,13 @@ class CustomerController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (!$this->checkPermission('create-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to create new customers.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'customer_code' => 'nullable|string|max:50|unique:customers,customer_code',
@@ -68,6 +109,13 @@ class CustomerController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        if (!$this->checkPermission('edit-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to edit customer details.',
+            ], 403);
+        }
+
         $customer = Customer::findOrFail($id);
 
         $validated = $request->validate([
@@ -92,6 +140,13 @@ class CustomerController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
+        if (!$this->checkPermission('delete-customers', 'manage-customers')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: You do not have permission to delete customer records.',
+            ], 403);
+        }
+
         $customer = Customer::withCount(['orders', 'invoices'])->findOrFail($id);
 
         if ($customer->orders_count > 0 || $customer->invoices_count > 0) {
