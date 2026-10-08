@@ -11,7 +11,10 @@ import {
   Star,
   Layers,
   X,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  Lock,
+  Info
 } from 'lucide-react';
 
 export default function TaxManagement() {
@@ -120,6 +123,55 @@ export default function TaxManagement() {
     }
   };
 
+  const handleDelete = (taxRate) => {
+    if (taxRate.is_default) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Cannot Delete Default Rate',
+        text: `"${taxRate.name}" is currently set as the default tax rate for the POS Terminal. Please set another rate as default before deleting this one.`,
+      });
+      return;
+    }
+
+    const ordersCount = taxRate.orders_count || 0;
+    if (ordersCount > 0) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Tax Rate Locked',
+        text: `Cannot delete "${taxRate.name}" because it has been used in ${ordersCount} sales order(s). Historical records and reports depend on this rate.`,
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Delete Tax Rate?',
+      text: `Are you sure you want to permanently delete "${taxRate.name}" (${taxRate.rate_percent || taxRate.rate}%)?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, delete it!',
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        try {
+          const res = await api.delete(`/tax-rates/${taxRate.id}`);
+          if (res.data.success) {
+            Swal.fire({
+              icon: 'success',
+              title: 'Deleted!',
+              text: res.data.message,
+              timer: 1500,
+              showConfirmButton: false,
+            });
+            fetchTaxRates();
+          }
+        } catch (err) {
+          // Handled
+        }
+      }
+    });
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Banner */}
@@ -155,65 +207,97 @@ export default function TaxManagement() {
             No tax rates configured yet.
           </div>
         ) : (
-          taxRates.map((tr) => (
-            <div
-              key={tr.id}
-              className={`bg-white rounded-2xl p-5 border transition-all shadow-xs flex flex-col justify-between space-y-4 ${
-                tr.is_default
-                  ? 'border-indigo-500 ring-2 ring-indigo-500/10'
-                  : 'border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-black text-slate-900">{tr.name}</span>
-                  {tr.is_default && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                      <Star className="w-3 h-3 fill-indigo-600 text-indigo-600" /> POS Default
-                    </span>
+          taxRates.map((tr) => {
+            const isUsed = (tr.orders_count || 0) > 0;
+            const isLocked = tr.is_default || isUsed;
+
+            return (
+              <div
+                key={tr.id}
+                className={`bg-white rounded-2xl p-5 border transition-all shadow-xs flex flex-col justify-between space-y-4 ${
+                  tr.is_default
+                    ? 'border-indigo-500 ring-2 ring-indigo-500/10'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-black text-slate-900">{tr.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {isUsed && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                          <Lock className="w-2.5 h-2.5 text-slate-500" /> {tr.orders_count} sale(s)
+                        </span>
+                      )}
+                      {tr.is_default && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <Star className="w-3 h-3 fill-indigo-600 text-indigo-600" /> Default
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-3xl font-black text-indigo-600 my-2">
+                    {Number(tr.rate_percent || tr.rate).toFixed(1)}%
+                  </div>
+
+                  <div className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100">
+                    <div className="flex justify-between">
+                      <span>Accounting Ledger:</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        #{tr.account?.code || '2010'} ({tr.account?.name || 'Tax Payable'})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Status:</span>
+                      <span className="text-emerald-600 font-bold">Active in POS</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                  {!tr.is_default ? (
+                    <button
+                      onClick={() => handleSetDefault(tr)}
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >
+                      Set as POS Default
+                    </button>
+                  ) : (
+                    <span className="text-[11px] text-slate-400 font-medium">Applied to new sales</span>
                   )}
-                </div>
 
-                <div className="text-3xl font-black text-indigo-600 my-2">
-                  {Number(tr.rate_percent || tr.rate).toFixed(1)}%
-                </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => openEditModal(tr)}
+                      className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                      title="Edit rate"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
 
-                <div className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between">
-                    <span>Accounting Ledger:</span>
-                    <span className="font-mono font-bold text-slate-800">
-                      #{tr.account?.code || '2010'} ({tr.account?.name || 'Tax Payable'})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Status:</span>
-                    <span className="text-emerald-600 font-bold">Active in POS</span>
+                    {isLocked ? (
+                      <button
+                        disabled
+                        className="p-1.5 rounded-lg border border-slate-100 text-slate-300 bg-slate-50 cursor-not-allowed"
+                        title={tr.is_default ? "Default rate cannot be deleted" : `Locked: Used in ${tr.orders_count} sales order(s)`}
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleDelete(tr)}
+                        className="p-1.5 rounded-lg border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-200 transition-colors"
+                        title="Delete tax rate"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                {!tr.is_default ? (
-                  <button
-                    onClick={() => handleSetDefault(tr)}
-                    className="text-xs font-bold text-indigo-600 hover:underline"
-                  >
-                    Set as POS Default
-                  </button>
-                ) : (
-                  <span className="text-[11px] text-slate-400 font-medium">Applied to new sales</span>
-                )}
-
-                <button
-                  onClick={() => openEditModal(tr)}
-                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                  title="Edit rate"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

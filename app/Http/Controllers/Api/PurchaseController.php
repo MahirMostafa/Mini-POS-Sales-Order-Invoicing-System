@@ -20,13 +20,64 @@ class PurchaseController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $purchases = Purchase::with(['items.variant.product', 'user'])
-            ->latest('id')
-            ->paginate(15);
+        $query = Purchase::with(['items.variant.product', 'user']);
+
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('purchase_number', 'like', "%{$search}%")
+                  ->orWhere('supplier_name', 'like', "%{$search}%")
+                  ->orWhere('supplier_phone', 'like', "%{$search}%")
+                  ->orWhere('supplier_invoice_no', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('start_date')) {
+            $query->whereDate('purchase_date', '>=', $request->get('start_date'));
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('purchase_date', '<=', $request->get('end_date'));
+        }
+
+        if ($request->filled('payment_method') && $request->get('payment_method') !== 'all') {
+            $query->where('payment_method', $request->get('payment_method'));
+        }
+
+        $perPage = $request->integer('per_page', 15);
+        $purchases = $query->latest('purchase_date')->latest('id')->paginate($perPage);
+
+        // Compute summary statistics
+        $statsQuery = Purchase::query();
+        if ($request->filled('start_date')) {
+            $statsQuery->whereDate('purchase_date', '>=', $request->get('start_date'));
+        }
+        if ($request->filled('end_date')) {
+            $statsQuery->whereDate('purchase_date', '<=', $request->get('end_date'));
+        }
+        $totalSpend = (float) $statsQuery->sum('total_amount');
+        $totalPurchasesCount = $statsQuery->count();
+        $totalItemsRestocked = (int) PurchaseItem::whereIn('purchase_id', $statsQuery->pluck('id'))->sum('quantity');
+
+        // Distinct recent suppliers for quick auto-fill
+        $suppliers = Purchase::query()
+            ->select('supplier_name', DB::raw('MAX(supplier_phone) as supplier_phone'))
+            ->whereNotNull('supplier_name')
+            ->where('supplier_name', '!=', '')
+            ->groupBy('supplier_name')
+            ->orderByDesc(DB::raw('MAX(id)'))
+            ->limit(20)
+            ->get();
 
         return response()->json([
             'success' => true,
             'purchases' => $purchases,
+            'summary' => [
+                'total_purchases' => $totalPurchasesCount,
+                'total_spend' => $totalSpend,
+                'total_items_restocked' => $totalItemsRestocked,
+            ],
+            'suppliers' => $suppliers,
         ]);
     }
 

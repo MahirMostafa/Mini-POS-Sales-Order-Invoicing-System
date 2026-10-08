@@ -10,12 +10,12 @@ class EloquentTaxRateRepository implements TaxRateRepositoryInterface
 {
     public function all(): Collection
     {
-        return TaxRate::with('account')->orderBy('name')->get();
+        return TaxRate::with('account')->withCount('orders')->orderBy('rate')->get();
     }
 
     public function getActive(): Collection
     {
-        return TaxRate::with('account')->where('is_active', true)->orderBy('rate')->get();
+        return TaxRate::with('account')->withCount('orders')->where('is_active', true)->orderBy('rate')->get();
     }
 
     public function getDefault(): ?TaxRate
@@ -26,7 +26,7 @@ class EloquentTaxRateRepository implements TaxRateRepositoryInterface
 
     public function findById(int $id): ?TaxRate
     {
-        return TaxRate::with('account')->find($id);
+        return TaxRate::with('account')->withCount('orders')->find($id);
     }
 
     public function create(array $data): TaxRate
@@ -51,5 +51,10 @@ class EloquentTaxRateRepository implements TaxRateRepositoryInterface
     {
         TaxRate::query()->update(['is_default' => false]);
         return $taxRate->update(['is_default' => true]);
+    }
+
+    public function delete(TaxRate $taxRate): bool
+    {
+        return (bool) $taxRate->delete();
     }
 }

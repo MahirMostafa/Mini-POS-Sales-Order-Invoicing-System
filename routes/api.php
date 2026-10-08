@@ -115,6 +115,7 @@ Route::prefix('tax-rates')->group(function () {
     Route::post('/', [TaxRateController::class, 'store']);
     Route::put('/{id}', [TaxRateController::class, 'update']);
     Route::post('/{id}/set-default', [TaxRateController::class, 'setDefault']);
+    Route::delete('/{id}', [TaxRateController::class, 'destroy']);
 });
 
 // Audit Logs

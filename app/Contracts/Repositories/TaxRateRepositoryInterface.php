@@ -14,4 +14,5 @@ interface TaxRateRepositoryInterface
     public function create(array $data): TaxRate;
     public function update(TaxRate $taxRate, array $data): bool;
     public function setDefault(TaxRate $taxRate): bool;
+    public function delete(TaxRate $taxRate): bool;
 }

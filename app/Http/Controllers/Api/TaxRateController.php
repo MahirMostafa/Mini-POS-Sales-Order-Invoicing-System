@@ -85,4 +85,34 @@ class TaxRateController extends Controller
             'message' => "'{$taxRate->name}' is now set as the default tax rate.",
         ]);
     }
+
+    public function destroy(int $id): JsonResponse
+    {
+        $taxRate = $this->taxRateRepo->findById($id);
+        if (!$taxRate) {
+            return response()->json(['success' => false, 'message' => 'Tax rate not found.'], 404);
+        }
+
+        if ($taxRate->is_default) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot delete the default POS tax rate. Please set another rate as default before deleting this one.",
+            ], 422);
+        }
+
+        $ordersCount = $taxRate->orders()->count();
+        if ($ordersCount > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Tax Rate '{$taxRate->name}' is locked because it is referenced in {$ordersCount} sales order(s). To preserve historical data integrity, it cannot be deleted.",
+            ], 422);
+        }
+
+        $this->taxRateRepo->delete($taxRate);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Tax rate '{$taxRate->name}' deleted successfully.",
+        ]);
+    }
 }

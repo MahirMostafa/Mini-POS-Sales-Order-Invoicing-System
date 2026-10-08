@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import Swal from 'sweetalert2';
 import { 
@@ -28,6 +29,7 @@ import PosPaymentModal from '../components/PosPaymentModal';
 import CustomerSearchSelect from '../components/CustomerSearchSelect';
 
 export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -432,8 +434,12 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
       }).then((result) => {
         handleResetCart();
         loadPosData();
-        if (result.isConfirmed && onNavigateToOrder) {
-          onNavigateToOrder(createdOrder.id);
+        if (result.isConfirmed) {
+          if (onNavigateToOrder) {
+            onNavigateToOrder(createdOrder.id);
+          } else {
+            navigate(`/orders/${createdOrder.id}`);
+          }
         }
       });
     } catch (err) {
