@@ -521,7 +521,7 @@ export default function ProductCatalog() {
       {/* Add / Edit Product & Variants Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-4xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2.5">
@@ -532,7 +532,7 @@ export default function ProductCatalog() {
                   <h3 className="font-bold text-sm text-slate-900">
                     {editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Product & Variants'}
                   </h3>
-                  <p className="text-[10px] text-slate-400">Specify multi-variant pricing, SKU, and stock</p>
+                  <p className="text-[10px] text-slate-400">Specify multi-variant pricing, SKU, barcode scanning, and initial stock</p>
                 </div>
               </div>
               <button
@@ -603,10 +603,10 @@ export default function ProductCatalog() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      Product Variants & Pricing
+                      Product Variants, Barcodes & Pricing
                     </h4>
                     <p className="text-[10px] text-slate-400">
-                      Add variants like "80ml" (৳100), "120ml" (৳150), etc.
+                      Add variants like "80ml" (৳100), "120ml" (৳150), along with unique SKU and Barcodes for POS scanning.
                     </p>
                   </div>
                   <button
@@ -625,7 +625,7 @@ export default function ProductCatalog() {
                       key={index}
                       className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-12 gap-2.5 items-center"
                     >
-                      <div className="col-span-6 sm:col-span-3">
+                      <div className="col-span-6 sm:col-span-2">
                         <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Variant Name *</label>
                         <input
                           type="text"
@@ -633,7 +633,7 @@ export default function ProductCatalog() {
                           placeholder="e.g. 80ml"
                           value={v.variant_name}
                           onChange={(e) => handleVariantChange(index, 'variant_name', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
@@ -645,11 +645,25 @@ export default function ProductCatalog() {
                           placeholder="PERF-80"
                           value={v.sku}
                           onChange={(e) => handleVariantChange(index, 'sku', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 font-mono outline-none"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 font-mono outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
-                      <div className="col-span-4 sm:col-span-2">
+                      <div className="col-span-6 sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5 flex items-center gap-1">
+                          <Barcode className="w-3 h-3 text-slate-400" />
+                          <span>Barcode / EAN</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 890123456789"
+                          value={v.barcode}
+                          onChange={(e) => handleVariantChange(index, 'barcode', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 font-mono outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div className="col-span-6 sm:col-span-2">
                         <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Cost Price (৳)</label>
                         <input
                           type="number"
@@ -657,11 +671,11 @@ export default function ProductCatalog() {
                           min="0"
                           value={v.cost_price}
                           onChange={(e) => handleVariantChange(index, 'cost_price', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
-                      <div className="col-span-4 sm:col-span-2">
+                      <div className="col-span-6 sm:col-span-2">
                         <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Selling Price (৳)</label>
                         <input
                           type="number"
@@ -669,30 +683,30 @@ export default function ProductCatalog() {
                           min="0"
                           value={v.selling_price}
                           onChange={(e) => handleVariantChange(index, 'selling_price', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-emerald-600 outline-none"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-bold text-emerald-600 outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
-                      <div className="col-span-3 sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Stock Qty</label>
+                      <div className="col-span-4 sm:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Stock</label>
                         <input
                           type="number"
                           min="0"
                           value={v.stock_quantity}
                           onChange={(e) => handleVariantChange(index, 'stock_quantity', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none"
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs text-slate-900 outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
-                      <div className="col-span-1 sm:col-span-1 text-right pt-4 sm:pt-0">
+                      <div className="col-span-2 sm:col-span-1 text-center pt-3 sm:pt-4">
                         <button
                           type="button"
                           onClick={() => handleRemoveVariantRow(index)}
                           disabled={productForm.variants.length <= 1}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 disabled:opacity-30"
+                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg disabled:opacity-30 transition-colors"
                           title="Remove variant"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 mx-auto" />
                         </button>
                       </div>
                     </div>
