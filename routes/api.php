@@ -92,6 +92,9 @@ Route::prefix('products')->group(function () {
 Route::prefix('customers')->group(function () {
     Route::get('/', [CustomerController::class, 'index']);
     Route::post('/', [CustomerController::class, 'store']);
+    Route::get('/{id}', [CustomerController::class, 'show']);
+    Route::put('/{id}', [CustomerController::class, 'update']);
+    Route::delete('/{id}', [CustomerController::class, 'destroy']);
 });
 
 // Tax Rates (Dynamic CRUD)

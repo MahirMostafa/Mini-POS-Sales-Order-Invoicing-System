@@ -50,6 +50,13 @@ export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
           icon: FileText,
           roles: ['Admin', 'Cashier', 'Accountant'],
           permissions: ['view-invoices', 'print-invoices']
+        },
+        {
+          path: '/customers',
+          label: 'Manage Customers',
+          icon: Users,
+          roles: ['Admin', 'Cashier'],
+          permissions: ['manage-customers']
         }
       ]
     },

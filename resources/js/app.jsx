@@ -14,6 +14,7 @@ import ProductCatalog from './pages/ProductCatalog';
 import PurchaseManagement from './pages/PurchaseManagement';
 import TaxManagement from './pages/TaxManagement';
 import UserManagement from './pages/UserManagement';
+import CustomerManagement from './pages/CustomerManagement';
 import RolePermissionManagement from './pages/RolePermissionManagement';
 import AuditLogs from './pages/AuditLogs';
 import { Loader2, ShieldAlert } from 'lucide-react';
@@ -145,6 +146,15 @@ function DashboardLayout() {
                   requiredPermissions={['view-invoices', 'print-invoices']}
                 >
                   <InvoicePreview />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute allowedRoles={['Admin', 'Cashier']} requiredPermissions={['manage-customers']}>
+                  <CustomerManagement />
                 </ProtectedRoute>
               }
             />
