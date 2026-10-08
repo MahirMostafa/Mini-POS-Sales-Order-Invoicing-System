@@ -9,7 +9,9 @@ import {
   CheckCircle2, 
   ShieldCheck, 
   Star,
-  Layers
+  Layers,
+  X,
+  RefreshCw
 } from 'lucide-react';
 
 export default function TaxManagement() {
@@ -49,7 +51,7 @@ export default function TaxManagement() {
     setEditingRate(null);
     setName('');
     setRate('5.00');
-    setAccountId(accounts.find(a => a.account_code === '2010')?.id || '');
+    setAccountId(accounts.find(a => a.code === '2010')?.id || '');
     setIsDefault(false);
     setShowModal(true);
   };
@@ -57,7 +59,7 @@ export default function TaxManagement() {
   const openEditModal = (taxRate) => {
     setEditingRate(taxRate);
     setName(taxRate.name);
-    setRate(taxRate.rate);
+    setRate(taxRate.rate_percent || taxRate.rate);
     setAccountId(taxRate.account_id || '');
     setIsDefault(taxRate.is_default);
     setShowModal(true);
@@ -73,8 +75,6 @@ export default function TaxManagement() {
           text: res.data.message,
           timer: 1500,
           showConfirmButton: false,
-          background: '#0f172a',
-          color: '#f8fafc',
         });
         fetchTaxRates();
       }
@@ -105,12 +105,10 @@ export default function TaxManagement() {
       if (res.data.success) {
         Swal.fire({
           icon: 'success',
-          title: editingRate ? 'Tax Rate Updated' : 'Tax Rate Created',
+          title: 'Tax Rate Saved',
           text: res.data.message,
           timer: 1500,
           showConfirmButton: false,
-          background: '#0f172a',
-          color: '#f8fafc',
         });
         setShowModal(false);
         fetchTaxRates();
@@ -123,148 +121,167 @@ export default function TaxManagement() {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top Banner */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
-            <Percent className="w-6 h-6 text-indigo-400" />
-            Dynamic Tax Configuration (CRUD)
-          </h1>
-          <p className="text-xs text-slate-400">
-            Configure sales tax / VAT percentage rates (e.g. 5%, 0%, 10%) and link to liability ledger accounts.
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
+            <Percent className="w-4 h-4" />
+            <span>Taxation & VAT Policy</span>
+          </div>
+          <h2 className="text-xl font-black text-slate-900">Dynamic Tax Rate Configurations</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Manage dynamic tax percentages (default 5% VAT) and linked liability accounts in the Chart of Accounts.
           </p>
         </div>
 
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
         >
-          <Plus className="w-4 h-4" /> Add New Tax Rate
+          <Plus className="w-4 h-4" /> Add Tax Rate
         </button>
       </div>
 
-      {/* Tax Rates Table */}
-      <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-bold">
-              <tr>
-                <th className="py-3 px-4">Tax Name</th>
-                <th className="py-3 px-4 text-center">Tax Rate (%)</th>
-                <th className="py-3 px-4">Ledger Liability Account</th>
-                <th className="py-3 px-4 text-center">Default for POS</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {loading ? (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-500">Loading tax rates...</td></tr>
-              ) : (
-                taxRates.map((tr) => (
-                  <tr key={tr.id} className="hover:bg-slate-800/30">
-                    <td className="py-3 px-4 font-bold text-slate-100">
-                      {tr.name}
-                    </td>
-                    <td className="py-3 px-4 text-center font-mono font-black text-indigo-400 text-sm">
-                      {Number(tr.rate).toFixed(2)}%
-                    </td>
-                    <td className="py-3 px-4">
-                      {tr.account ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-xs text-indigo-400 font-semibold">[{tr.account.account_code}]</span>
-                          <span className="text-slate-300">{tr.account.account_name}</span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">Account 2010 (Tax Payable)</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {tr.is_default ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                          <Star className="w-3 h-3 fill-indigo-400 text-indigo-400" /> Default POS Rate
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleSetDefault(tr)}
-                          className="text-[11px] font-semibold text-slate-400 hover:text-indigo-300 underline"
-                        >
-                          Make Default
-                        </button>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
-                        ACTIVE
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => openEditModal(tr)}
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      {/* Tax Rates Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {loading ? (
+          <div className="col-span-3 py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-500" />
+            Loading tax rates...
+          </div>
+        ) : taxRates.length === 0 ? (
+          <div className="col-span-3 py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
+            No tax rates configured yet.
+          </div>
+        ) : (
+          taxRates.map((tr) => (
+            <div
+              key={tr.id}
+              className={`bg-white rounded-2xl p-5 border transition-all shadow-xs flex flex-col justify-between space-y-4 ${
+                tr.is_default
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/10'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-xs font-black text-slate-900">{tr.name}</span>
+                  {tr.is_default && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      <Star className="w-3 h-3 fill-indigo-600 text-indigo-600" /> POS Default
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-3xl font-black text-indigo-600 my-2">
+                  {Number(tr.rate_percent || tr.rate).toFixed(1)}%
+                </div>
+
+                <div className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100">
+                  <div className="flex justify-between">
+                    <span>Accounting Ledger:</span>
+                    <span className="font-mono font-bold text-slate-800">
+                      #{tr.account?.code || '2010'} ({tr.account?.name || 'Tax Payable'})
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Status:</span>
+                    <span className="text-emerald-600 font-bold">Active in POS</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                {!tr.is_default ? (
+                  <button
+                    onClick={() => handleSetDefault(tr)}
+                    className="text-xs font-bold text-indigo-600 hover:underline"
+                  >
+                    Set as POS Default
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-slate-400 font-medium">Applied to new sales</span>
+                )}
+
+                <button
+                  onClick={() => openEditModal(tr)}
+                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  title="Edit rate"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
-      {/* Modal */}
+      {/* Create / Edit Tax Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-6 relative">
-            <h3 className="text-base font-bold text-slate-100 mb-1">
-              {editingRate ? 'Edit Tax Rate' : 'Add New Tax Rate'}
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Configure percentage and accounting ledger mapping.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 relative">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <Percent className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {editingRate ? 'Edit Tax Rate' : 'New Tax Rate'}
+                  </h3>
+                  <p className="text-xs text-slate-400">Configure percentage and GL mapping</p>
+                </div>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Tax Rate Name</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tax Name / Label <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Standard VAT (5.00%)"
+                  placeholder="e.g. Standard VAT (5%)"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Tax Percentage (%)</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tax Percentage (%) <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   max="100"
                   required
-                  placeholder="e.g. 5.00"
+                  placeholder="5.00"
                   value={rate}
                   onChange={(e) => setRate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-bold"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-bold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Chart of Accounts Mapping</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Linked Liability Account in GL
+                </label>
                 <select
                   value={accountId}
                   onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
                 >
-                  <option value="">Default (2010 - Tax Payable)</option>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.account_code} - {a.account_name} ({a.account_type})
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      #{acc.code} - {acc.name} ({acc.type})
                     </option>
                   ))}
                 </select>
@@ -273,30 +290,30 @@ export default function TaxManagement() {
               <div className="flex items-center gap-2 pt-2">
                 <input
                   type="checkbox"
-                  id="isDefaultCheck"
+                  id="is_default_chk"
                   checked={isDefault}
                   onChange={(e) => setIsDefault(e.target.checked)}
-                  className="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700"
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
                 />
-                <label htmlFor="isDefaultCheck" className="text-xs text-slate-300 cursor-pointer">
-                  Set as default active tax rate for POS checkout
+                <label htmlFor="is_default_chk" className="text-xs font-bold text-slate-700 cursor-pointer">
+                  Set as system default tax rate on POS terminal
                 </label>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 bg-slate-800 hover:bg-slate-700"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20"
                 >
-                  {saving ? 'Saving...' : 'Save Tax Configuration'}
+                  {saving ? 'Saving...' : 'Save Tax Rate'}
                 </button>
               </div>
             </form>

@@ -14,7 +14,8 @@ import {
   Calendar, 
   DollarSign, 
   BookOpen, 
-  Layers 
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
@@ -59,9 +60,7 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
           confirmButtonText: 'View Invoice',
           showCancelButton: true,
           cancelButtonText: 'Stay Here',
-          background: '#0f172a',
-          color: '#f8fafc',
-          confirmButtonColor: '#6366f1',
+          confirmButtonColor: '#4f46e5',
         }).then((result) => {
           if (result.isConfirmed && res.data.invoice) {
             onNavigateToInvoice?.(res.data.invoice.id);
@@ -80,7 +79,8 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
 
   if (loading) {
     return (
-      <div className="p-12 text-center text-slate-500">
+      <div className="p-16 text-center text-slate-400">
+        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-indigo-500" />
         Loading sales order details...
       </div>
     );
@@ -88,9 +88,9 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
 
   if (!order) {
     return (
-      <div className="p-12 text-center text-slate-400">
+      <div className="p-16 text-center text-slate-500">
         <p>Order not found.</p>
-        <button onClick={onBack} className="mt-3 px-4 py-1.5 rounded-lg bg-slate-800 text-xs text-white">
+        <button onClick={onBack} className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white">
           Go Back
         </button>
       </div>
@@ -102,220 +102,213 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
   const isCancelled = order.status === 'cancelled';
 
   return (
-    <div className="p-4 lg:p-6 max-w-5xl mx-auto space-y-6">
-      {/* Top Header & Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black text-slate-100 font-mono">
-                {order.order_number}
-              </h1>
-              <span
-                className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                  isCompleted
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : isPending
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                }`}
-              >
-                {order.status.toUpperCase()}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Placed on {order.order_date}</p>
-          </div>
-        </div>
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      {/* Top Bar with Back button */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Orders
+        </button>
 
-        {/* Action Buttons */}
         <div className="flex items-center gap-2">
-          {isPending && (
-            <button
-              onClick={() => setShowCompleteModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all"
-            >
-              <CheckCircle className="w-4 h-4" />
-              Complete Order & Issue Invoice
-            </button>
-          )}
-
           {isCompleted && order.invoice && (
             <button
               onClick={() => onNavigateToInvoice?.(order.invoice.id)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
             >
-              <Receipt className="w-4 h-4" />
-              View Printable Invoice
+              <FileText className="w-4 h-4" /> View Invoice #{order.invoice.invoice_number}
+            </button>
+          )}
+
+          {isPending && (
+            <button
+              disabled={!stockCheck.is_available}
+              onClick={() => setShowCompleteModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all"
+            >
+              <CheckCircle className="w-4 h-4" /> Complete & Deduct Stock
             </button>
           )}
         </div>
       </div>
 
-      {/* Stock availability warning (if pending & insufficient) */}
-      {isPending && !stockCheck.is_available && (
-        <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h4 className="font-bold text-rose-300">Stock Shortage Detected</h4>
-            <p className="text-slate-300">
-              One or more line items do not have sufficient stock to complete this order:
-            </p>
-            <ul className="list-disc list-inside space-y-0.5 text-rose-300 font-semibold">
-              {stockCheck.items?.map((it, idx) => (
-                <li key={idx}>{it.message}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Info Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Customer Info */}
-        <div className="glass-panel rounded-2xl p-4 space-y-1.5">
-          <div className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-            <User className="w-3.5 h-3.5 text-indigo-400" /> Customer Information
-          </div>
-          <div className="text-sm font-bold text-slate-100">{order.customer?.name}</div>
-          <div className="text-xs text-slate-400">{order.customer?.customer_code}</div>
-          <div className="text-xs text-slate-400">{order.customer?.phone || 'No phone'}</div>
-          {order.customer?.address && (
-            <div className="text-xs text-slate-400">{order.customer?.address}</div>
-          )}
-        </div>
-
-        {/* Order Details */}
-        <div className="glass-panel rounded-2xl p-4 space-y-1.5">
-          <div className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-indigo-400" /> Order Details
-          </div>
-          <div className="text-xs text-slate-300">
-            <strong>Payment Method:</strong> {order.payment_method?.toUpperCase()}
-          </div>
-          <div className="text-xs text-slate-300">
-            <strong>Payment Status:</strong> {order.payment_status?.toUpperCase()}
-          </div>
-          <div className="text-xs text-slate-300">
-            <strong>Handled By:</strong> {order.user?.name || 'Cashier'}
-          </div>
-          {order.completed_at && (
-            <div className="text-xs text-emerald-400 font-medium">
-              Completed on {new Date(order.completed_at).toLocaleString()}
+      {/* Main Order Card */}
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+        {/* Order Header info */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-2xl font-black font-mono text-slate-900">
+                Order #{order.order_number}
+              </h2>
+              <span
+                className={`inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-full text-xs ${
+                  isCompleted
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    : isPending
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                }`}
+              >
+                {isCompleted && <CheckCircle className="w-3.5 h-3.5" />}
+                {isPending && <Clock className="w-3.5 h-3.5" />}
+                {isCancelled && <XCircle className="w-3.5 h-3.5" />}
+                <span className="capitalize">{order.status}</span>
+              </span>
             </div>
-          )}
+            <p className="text-xs text-slate-400">
+              Created on {new Date(order.created_at).toLocaleString()} • Logged by {order.user?.name || 'System'}
+            </p>
+          </div>
+
+          <div className="sm:text-right">
+            <span className="text-xs text-slate-400">Grand Total</span>
+            <div className="text-2xl font-black text-indigo-600">
+              {currency}{Number(order.grand_total).toFixed(2)}
+            </div>
+          </div>
         </div>
 
-        {/* Financial Summary */}
-        <div className="glass-panel rounded-2xl p-4 space-y-1.5 bg-gradient-to-br from-indigo-950/40 to-slate-900">
-          <div className="text-[11px] font-bold uppercase text-indigo-300 flex items-center gap-1.5">
-            <DollarSign className="w-3.5 h-3.5 text-indigo-400" /> Financial Summary
+        {/* Stock Availability Pre-check Alert (For Pending Orders) */}
+        {isPending && (
+          <div
+            className={`p-4 rounded-2xl border text-xs flex items-start gap-3 ${
+              stockCheck.is_available
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            {stockCheck.is_available ? (
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <div className="font-bold">
+                {stockCheck.is_available
+                  ? 'All items in stock and ready for completion.'
+                  : 'Stock Shortage Detected! Order cannot be completed.'}
+              </div>
+              <p className="text-[11px] mt-0.5 opacity-80">
+                {stockCheck.is_available
+                  ? 'Completing this order will deduct stock from product variants and record double-entry accounting journal entries.'
+                  : 'One or more items in this order do not have enough stock available in inventory.'}
+              </p>
+            </div>
           </div>
-          <div className="text-xs flex justify-between text-slate-300">
-            <span>Subtotal:</span>
-            <span>{currency}{Number(order.subtotal).toFixed(2)}</span>
+        )}
+
+        {/* Customer & Order Metadata Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+          <div>
+            <span className="text-slate-400 block mb-0.5 font-bold uppercase text-[10px]">Customer Details</span>
+            <div className="font-bold text-slate-900">{order.customer?.name}</div>
+            <div className="text-slate-500">{order.customer?.phone || 'No phone'}</div>
+            <div className="text-slate-400 text-[11px]">{order.customer?.email || 'No email'}</div>
           </div>
-          <div className="text-xs flex justify-between text-rose-300">
-            <span>Discount:</span>
-            <span>-{currency}{Number(order.discount_amount).toFixed(2)}</span>
+
+          <div>
+            <span className="text-slate-400 block mb-0.5 font-bold uppercase text-[10px]">Billing Info</span>
+            <div className="font-medium text-slate-700">Tax Reg: {order.customer?.tax_number || 'N/A'}</div>
+            <div className="text-slate-500 line-clamp-2">{order.customer?.address || 'Standard retail counter'}</div>
           </div>
-          <div className="text-xs flex justify-between text-slate-300">
-            <span>Tax ({Number(order.tax_rate).toFixed(1)}%):</span>
-            <span>+{currency}{Number(order.tax_amount).toFixed(2)}</span>
-          </div>
-          <div className="pt-1.5 border-t border-slate-700 flex justify-between font-black text-sm text-white">
-            <span>Grand Total:</span>
-            <span className="text-indigo-300">{currency}{Number(order.grand_total).toFixed(2)}</span>
+
+          <div>
+            <span className="text-slate-400 block mb-0.5 font-bold uppercase text-[10px]">Tax & Discounts</span>
+            <div className="font-bold text-slate-900">
+              Tax applied: {order.tax_rate_percent}% ({order.tax_rate_name})
+            </div>
+            <div className="text-slate-500">
+              Discount: {order.discount_type === 'percent' ? `${order.discount_value}%` : `${currency}${order.discount_value}`}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Line Items Table */}
-      <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800">
-        <div className="px-4 py-3 bg-slate-900/90 border-b border-slate-800 font-bold text-xs text-slate-200">
-          Order Line Items
-        </div>
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="bg-slate-900/60 text-slate-400 uppercase text-[10px]">
-            <tr>
-              <th className="py-2.5 px-4">Item & Variant</th>
-              <th className="py-2.5 px-4">SKU</th>
-              <th className="py-2.5 px-4 text-center">Qty</th>
-              <th className="py-2.5 px-4 text-right">Unit Price</th>
-              <th className="py-2.5 px-4 text-right">Discount</th>
-              <th className="py-2.5 px-4 text-right">Line Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {order.items?.map((item) => (
-              <tr key={item.id}>
-                <td className="py-3 px-4">
-                  <div className="font-semibold text-slate-100">{item.product_name}</div>
-                  {item.variant_name && (
-                    <div className="text-[10px] text-indigo-400">{item.variant_name}</div>
-                  )}
-                </td>
-                <td className="py-3 px-4 font-mono text-slate-400">{item.product_sku || '-'}</td>
-                <td className="py-3 px-4 text-center font-bold">{item.quantity}</td>
-                <td className="py-3 px-4 text-right">{currency}{Number(item.unit_price).toFixed(2)}</td>
-                <td className="py-3 px-4 text-right text-rose-400">-{currency}{Number(item.discount).toFixed(2)}</td>
-                <td className="py-3 px-4 text-right font-bold text-slate-100">
-                  {currency}{Number(item.line_total).toFixed(2)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Double-Entry Accounting Preview (if completed) */}
-      {order.journal_entry && (
-        <div className="glass-panel rounded-2xl p-4 space-y-3 border border-indigo-500/20">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
-              <BookOpen className="w-4 h-4 text-indigo-400" /> Automatic Double-Entry Journal Entry ({order.journal_entry.entry_number})
-            </h3>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Balanced (Total: {currency}{Number(order.journal_entry.total_debit).toFixed(2)})
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase">
+        {/* Items Table */}
+        <div>
+          <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-3">
+            Sales Order Items Breakdown
+          </h4>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase border-b border-slate-200">
                 <tr>
-                  <th className="py-2 px-3">Account Code & Name</th>
-                  <th className="py-2 px-3">Narration</th>
-                  <th className="py-2 px-3 text-right">Debit ({currency})</th>
-                  <th className="py-2 px-3 text-right">Credit ({currency})</th>
+                  <th className="py-3 px-4">Item & Variant</th>
+                  <th className="py-3 px-4">SKU</th>
+                  <th className="py-3 px-4 text-right">Unit Price</th>
+                  <th className="py-3 px-4 text-center">Ordered Qty</th>
+                  <th className="py-3 px-4 text-center">Current Stock</th>
+                  <th className="py-3 px-4 text-right">Line Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800 font-mono text-xs">
-                {order.journal_entry.items?.map((ji) => (
-                  <tr key={ji.id}>
-                    <td className="py-2 px-3 font-semibold text-slate-200 font-sans">
-                      <span className="font-mono text-indigo-400 mr-2">{ji.account?.account_code}</span>
-                      {ji.account?.account_name}
-                    </td>
-                    <td className="py-2 px-3 text-slate-400 font-sans text-[11px]">{ji.narration}</td>
-                    <td className="py-2 px-3 text-right font-bold text-emerald-400">
-                      {Number(ji.debit) > 0 ? Number(ji.debit).toFixed(2) : '-'}
-                    </td>
-                    <td className="py-2 px-3 text-right font-bold text-indigo-300">
-                      {Number(ji.credit) > 0 ? Number(ji.credit).toFixed(2) : '-'}
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-100">
+                {order.items?.map((item) => {
+                  const check = stockCheck.items?.find((s) => s.order_item_id === item.id);
+                  const isStockSufficient = check ? check.has_sufficient_stock : true;
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-slate-900">{item.product_name}</div>
+                        <div className="text-indigo-600 font-semibold text-[11px]">{item.variant_name}</div>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-500">{item.sku}</td>
+                      <td className="py-3 px-4 text-right text-slate-700 font-medium">
+                        {currency}{Number(item.unit_price).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-slate-900">
+                        {item.quantity}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isStockSufficient
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}
+                        >
+                          {item.variant?.stock_quantity ?? 'N/A'} available
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-black text-slate-900">
+                        {currency}{Number(item.line_total).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
-      )}
+
+        {/* Totals Summary Card */}
+        <div className="flex justify-end pt-2">
+          <div className="w-full sm:w-72 space-y-2 text-xs">
+            <div className="flex justify-between text-slate-500">
+              <span>Subtotal:</span>
+              <span className="font-bold text-slate-800">{currency}{Number(order.subtotal).toFixed(2)}</span>
+            </div>
+            {Number(order.discount_amount) > 0 && (
+              <div className="flex justify-between text-rose-600">
+                <span>Discount:</span>
+                <span>-{currency}{Number(order.discount_amount).toFixed(2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-slate-500">
+              <span>Tax ({order.tax_rate_percent}%):</span>
+              <span className="font-bold text-slate-800">+{currency}{Number(order.tax_amount).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
+              <span className="font-black text-slate-900">Grand Total:</span>
+              <span className="font-black text-xl text-indigo-600">
+                {currency}{Number(order.grand_total).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Complete Order Modal */}
       {showCompleteModal && (

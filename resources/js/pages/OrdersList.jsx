@@ -4,15 +4,15 @@ import Swal from 'sweetalert2';
 import { 
   FileText, 
   Search, 
-  Filter, 
   CheckCircle, 
   Clock, 
   XCircle, 
   Receipt, 
   Eye, 
-  ArrowUpDown, 
   Calendar,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  ShoppingBag
 } from 'lucide-react';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
@@ -76,9 +76,7 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
           confirmButtonText: 'View Invoice',
           showCancelButton: true,
           cancelButtonText: 'Close',
-          background: '#0f172a',
-          color: '#f8fafc',
-          confirmButtonColor: '#6366f1',
+          confirmButtonColor: '#4f46e5',
         }).then((result) => {
           if (result.isConfirmed && res.data.invoice) {
             onNavigateToInvoice?.(res.data.invoice.id);
@@ -89,7 +87,7 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
         fetchOrders(pagination.current_page || 1);
       }
     } catch (err) {
-      // Axios interceptor will show the error details (e.g. insufficient stock error)
+      // Axios interceptor will show the error details
     } finally {
       setCompleting(false);
     }
@@ -99,25 +97,23 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
   const handleCancelOrder = (order) => {
     Swal.fire({
       title: 'Cancel Order?',
-      text: `Are you sure you want to cancel order #${order.order_number}?`,
+      text: `Are you sure you want to cancel Order #${order.order_number}?`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Yes, Cancel Order',
       confirmButtonColor: '#e11d48',
-      cancelButtonColor: '#334155',
-      background: '#0f172a',
-      color: '#f8fafc',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Yes, cancel it!',
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
-          const res = await api.post(`/orders/${order.id}/cancel`, { reason: 'Cancelled by operator' });
+          const res = await api.post(`/orders/${order.id}/cancel`);
           if (res.data.success) {
             Swal.fire({
               icon: 'success',
               title: 'Cancelled',
               text: res.data.message,
-              background: '#0f172a',
-              color: '#f8fafc',
+              timer: 1500,
+              showConfirmButton: false,
             });
             fetchOrders(pagination.current_page || 1);
           }
@@ -129,96 +125,93 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Top Banner */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-slate-100 flex items-center gap-2">
-            <FileText className="w-6 h-6 text-indigo-400" />
-            Sales Orders Management
-          </h1>
-          <p className="text-xs text-slate-400">
-            Pending to Completed workflow with live stock verification & automatic accounting entries.
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider mb-1">
+            <Receipt className="w-4 h-4" />
+            <span>Order Fulfillment Lifecycle</span>
+          </div>
+          <h2 className="text-xl font-black text-slate-900">Sales Orders Registry</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Transition orders from <span className="text-amber-600 font-bold">Pending</span> to <span className="text-emerald-600 font-bold">Completed</span>, validate stock availability, and issue invoices.
           </p>
+        </div>
+
+        {/* Quick status tabs */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 border border-slate-200">
+          {[
+            { id: '', label: 'All Orders' },
+            { id: 'pending', label: 'Pending' },
+            { id: 'completed', label: 'Completed' },
+            { id: 'cancelled', label: 'Cancelled' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setStatusFilter(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                statusFilter === tab.id
+                  ? 'bg-white text-indigo-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="glass-panel rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Status Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          {[
-            { id: '', label: 'All Statuses' },
-            { id: 'pending', label: 'Pending Orders', icon: Clock, color: 'text-amber-400' },
-            { id: 'completed', label: 'Completed', icon: CheckCircle, color: 'text-emerald-400' },
-            { id: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'text-rose-400' },
-          ].map((status) => {
-            const isSelected = statusFilter === status.id;
-            return (
-              <button
-                key={status.id}
-                onClick={() => setStatusFilter(status.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                    : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {status.icon && <status.icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : status.color}`} />}
-                {status.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search Input */}
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search order #, customer..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700"
-          >
-            Filter
-          </button>
+      {/* Filter / Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search order # or customer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 shadow-xs"
+          />
         </form>
+
+        <button
+          type="button"
+          onClick={() => fetchOrders(1)}
+          className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 shadow-xs transition-colors self-end sm:self-auto"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Orders Table */}
-      <div className="glass-panel rounded-2xl overflow-hidden border border-slate-800 shadow-xl">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
-              <tr>
-                <th className="py-3.5 px-4">Order Number</th>
-                <th className="py-3.5 px-4">Date</th>
-                <th className="py-3.5 px-4">Customer</th>
-                <th className="py-3.5 px-4">Items Summary</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Payment</th>
-                <th className="py-3.5 px-4 text-right">Grand Total</th>
-                <th className="py-3.5 px-4 text-center">Actions</th>
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="py-3.5 px-6">Order #</th>
+                <th className="py-3.5 px-6">Customer</th>
+                <th className="py-3.5 px-6">Date</th>
+                <th className="py-3.5 px-6">Items</th>
+                <th className="py-3.5 px-6 text-right">Grand Total</th>
+                <th className="py-3.5 px-6 text-center">Status</th>
+                <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-500">
-                    Loading sales orders...
+                  <td colSpan="7" className="py-12 text-center text-slate-400">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-500" />
+                    Loading orders...
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-500">
-                    No sales orders found matching your criteria.
+                  <td colSpan="7" className="py-12 text-center text-slate-400">
+                    No sales orders found matching criteria.
                   </td>
                 </tr>
               ) : (
@@ -228,109 +221,82 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                   const isCancelled = order.status === 'cancelled';
 
                   return (
-                    <tr key={order.id} className="hover:bg-slate-800/30 transition-colors">
-                      {/* Order Number */}
-                      <td className="py-3 px-4 font-mono font-bold text-indigo-300">
+                    <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="py-4 px-6 font-bold font-mono text-indigo-600">
                         {order.order_number}
                       </td>
-
-                      {/* Date */}
-                      <td className="py-3 px-4 text-slate-400">
+                      <td className="py-4 px-6">
+                        <div className="font-bold text-slate-900">{order.customer?.name || 'Walk-in'}</div>
+                        <div className="text-[10px] text-slate-400">{order.customer?.phone || 'No phone'}</div>
+                      </td>
+                      <td className="py-4 px-6 text-slate-600">
                         {order.order_date}
                       </td>
-
-                      {/* Customer */}
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-100">{order.customer?.name}</div>
-                        <div className="text-[10px] text-slate-400">{order.customer?.customer_code}</div>
+                      <td className="py-4 px-6 text-slate-700 font-medium">
+                        {order.items?.length || 0} line item(s)
                       </td>
-
-                      {/* Items Summary */}
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="text-slate-200 truncate">
-                          {order.items?.map(i => `${i.quantity}x ${i.product_name}`).join(', ')}
-                        </div>
-                        <div className="text-[10px] text-slate-400">{order.items?.length || 0} line items</div>
+                      <td className="py-4 px-6 text-right font-black text-slate-900">
+                        {currency}{Number(order.grand_total).toFixed(2)}
                       </td>
-
-                      {/* Status Badge */}
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-6 text-center">
                         <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          className={`inline-flex items-center gap-1 font-bold px-2.5 py-0.5 rounded-full text-[10px] ${
                             isCompleted
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                               : isPending
-                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-rose-100 text-rose-800 border border-rose-200'
                           }`}
                         >
                           {isCompleted && <CheckCircle className="w-3 h-3" />}
                           {isPending && <Clock className="w-3 h-3" />}
                           {isCancelled && <XCircle className="w-3 h-3" />}
-                          {order.status.toUpperCase()}
+                          <span className="capitalize">{order.status}</span>
                         </span>
                       </td>
-
-                      {/* Payment Status */}
-                      <td className="py-3 px-4">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                          order.payment_status === 'paid' ? 'bg-emerald-950/60 text-emerald-300' :
-                          order.payment_status === 'partially_paid' ? 'bg-amber-950/60 text-amber-300' :
-                          'bg-slate-800 text-slate-400'
-                        }`}>
-                          {order.payment_status.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </td>
-
-                      {/* Total */}
-                      <td className="py-3 px-4 text-right font-bold text-slate-100">
-                        {currency}{Number(order.grand_total).toFixed(2)}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          {/* View Details */}
+                      <td className="py-4 px-6 text-right">
+                        <div className="flex items-center justify-end gap-2">
                           <button
+                            type="button"
                             onClick={() => onNavigateToOrder?.(order.id)}
-                            title="View Order Details"
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1 font-bold text-[11px]"
+                            title="View order audit details"
                           >
                             <Eye className="w-3.5 h-3.5" />
+                            <span>Details</span>
                           </button>
 
-                          {/* Complete Order Button (if Pending) */}
                           {isPending && (
                             <button
+                              type="button"
                               onClick={() => setActiveOrderToComplete(order)}
-                              title="Complete Order (Deduct Stock & Post Double Entry)"
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/30 transition-all"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1"
                             >
                               <CheckCircle className="w-3 h-3" />
-                              Complete
+                              <span>Complete</span>
                             </button>
                           )}
 
-                          {/* View Invoice Button (if Completed) */}
                           {isCompleted && order.invoice && (
                             <button
+                              type="button"
                               onClick={() => onNavigateToInvoice?.(order.invoice.id)}
-                              title="View Invoice"
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/30 transition-all"
+                              className="p-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors font-bold text-[11px] inline-flex items-center gap-1"
+                              title="Print Invoice"
                             >
-                              <Receipt className="w-3 h-3" />
-                              Invoice
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Invoice</span>
                             </button>
                           )}
 
-                          {/* Cancel button (if Pending) */}
                           {isPending && (
                             <button
+                              type="button"
                               onClick={() => handleCancelOrder(order)}
+                              className="p-1.5 rounded-lg border border-slate-200 text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors text-[11px] font-bold"
                               title="Cancel Order"
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                             >
-                              <XCircle className="w-3.5 h-3.5" />
+                              Cancel
                             </button>
                           )}
                         </div>
@@ -343,24 +309,26 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
           </table>
         </div>
 
-        {/* Pagination Bar */}
+        {/* Pagination */}
         {pagination.last_page > 1 && (
-          <div className="p-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <div>
-              Showing page {pagination.current_page} of {pagination.last_page} ({pagination.total} orders)
-            </div>
-            <div className="flex items-center gap-1">
+          <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>
+              Page {pagination.current_page} of {pagination.last_page} ({pagination.total} total orders)
+            </span>
+            <div className="flex items-center gap-2">
               <button
-                disabled={pagination.current_page === 1}
+                type="button"
+                disabled={pagination.current_page <= 1}
                 onClick={() => fetchOrders(pagination.current_page - 1)}
-                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                className="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
               >
                 Previous
               </button>
               <button
-                disabled={pagination.current_page === pagination.last_page}
+                type="button"
+                disabled={pagination.current_page >= pagination.last_page}
                 onClick={() => fetchOrders(pagination.current_page + 1)}
-                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50"
+                className="px-3 py-1 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
               >
                 Next
               </button>

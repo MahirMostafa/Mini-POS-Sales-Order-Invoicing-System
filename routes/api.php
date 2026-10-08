@@ -56,7 +56,29 @@ Route::prefix('accounting')->group(function () {
     Route::get('/ledger/{accountId}', [AccountingController::class, 'ledger']);
 });
 
+// User Management
+Route::prefix('users')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\UserController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\UserController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\Api\UserController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\Api\UserController::class, 'destroy']);
+});
+
+// Roles & Permissions (Spatie)
+Route::prefix('roles')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\RolePermissionController::class, 'store']);
+    Route::put('/{roleId}/permissions', [\App\Http\Controllers\Api\RolePermissionController::class, 'updatePermissions']);
+});
+
+// Purchases & Inflow Management
+Route::prefix('purchases')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\PurchaseController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\Api\PurchaseController::class, 'store']);
+});
+
 // Products & Inventory
+
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::post('/', [ProductController::class, 'store']);

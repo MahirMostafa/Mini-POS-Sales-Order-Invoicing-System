@@ -12,15 +12,21 @@ class AuthController extends Controller
 {
     public function me(): JsonResponse
     {
-        $user = Auth::user() ?? User::with('roles')->first();
-        if ($user) {
-            $user->load('roles');
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'user' => null,
+                'role' => null,
+                'permissions' => [],
+            ]);
         }
+
+        $user->load('roles');
 
         return response()->json([
             'user' => $user,
-            'role' => $user?->roles->pluck('name')->first() ?? 'Admin',
-            'permissions' => $user ? $user->getAllPermissions()->pluck('name') : [],
+            'role' => $user->roles->pluck('name')->first() ?? 'Admin',
+            'permissions' => $user->getAllPermissions()->pluck('name'),
         ]);
     }
 
