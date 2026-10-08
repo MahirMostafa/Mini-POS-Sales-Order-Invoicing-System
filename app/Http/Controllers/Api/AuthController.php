@@ -38,7 +38,9 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+            }
             $user = Auth::user()->load('roles');
 
             return response()->json([
@@ -59,7 +61,9 @@ class AuthController extends Controller
     {
         $user = User::with('roles')->findOrFail($userId);
         Auth::login($user);
-        request()->session()->regenerate();
+        if (request()->hasSession()) {
+            request()->session()->regenerate();
+        }
 
         return response()->json([
             'success' => true,
@@ -82,8 +86,10 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->json([
             'success' => true,
