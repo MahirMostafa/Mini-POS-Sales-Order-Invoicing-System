@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Store,
@@ -13,13 +14,13 @@ import {
   ShieldCheck,
   Activity,
   LogOut,
-  ChevronRight,
-  User,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 
-export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIsMobileOpen }) {
+export default function Sidebar({ isMobileOpen, setIsMobileOpen }) {
   const { user, role, logout } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const userRole = role || user?.roles?.[0]?.name || 'Admin';
 
@@ -34,7 +35,7 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       title: 'POS & Sales',
       items: [
         {
-          id: 'pos',
+          path: '/pos',
           label: 'POS Counter',
           icon: ShoppingCart,
           roles: ['Admin', 'Cashier'],
@@ -42,13 +43,13 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
           badgeColor: 'bg-emerald-100 text-emerald-700'
         },
         {
-          id: 'orders',
+          path: '/orders',
           label: 'Sales Orders',
           icon: Receipt,
           roles: ['Admin', 'Cashier', 'Accountant']
         },
         {
-          id: 'invoices',
+          path: '/invoices',
           label: 'Invoices & Receipts',
           icon: FileText,
           roles: ['Admin', 'Cashier', 'Accountant']
@@ -59,13 +60,13 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       title: 'Inventory & Procurement',
       items: [
         {
-          id: 'products',
+          path: '/products',
           label: 'Manage Products',
           icon: Package,
           roles: ['Admin', 'Cashier', 'Accountant']
         },
         {
-          id: 'purchases',
+          path: '/purchases',
           label: 'Manage Purchases',
           icon: Truck,
           roles: ['Admin', 'Accountant']
@@ -76,13 +77,13 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       title: 'Finance & Accounting',
       items: [
         {
-          id: 'accounting',
+          path: '/accounting',
           label: 'Accounting Dashboard',
           icon: Calculator,
           roles: ['Admin', 'Accountant']
         },
         {
-          id: 'taxes',
+          path: '/taxes',
           label: 'Tax Rates (VAT)',
           icon: Percent,
           roles: ['Admin', 'Accountant']
@@ -93,19 +94,19 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       title: 'Administration',
       items: [
         {
-          id: 'users',
+          path: '/users',
           label: 'Manage Users',
           icon: Users,
           roles: ['Admin']
         },
         {
-          id: 'roles',
+          path: '/roles',
           label: 'Role & Permissions',
           icon: ShieldCheck,
           roles: ['Admin']
         },
         {
-          id: 'audit',
+          path: '/audit',
           label: 'Audit Activity Logs',
           icon: Activity,
           roles: ['Admin']
@@ -113,6 +114,11 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
       ]
     }
   ];
+
+  const handleNavClick = (path) => {
+    navigate(path);
+    if (setIsMobileOpen) setIsMobileOpen(false);
+  };
 
   return (
     <>
@@ -187,15 +193,15 @@ export default function Sidebar({ activePage, setActivePage, isMobileOpen, setIs
                 <div className="space-y-1">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activePage === item.id;
+                    const isActive =
+                      location.pathname === item.path ||
+                      (item.path !== '/' && location.pathname.startsWith(item.path));
+
                     return (
                       <button
-                        key={item.id}
+                        key={item.path}
                         type="button"
-                        onClick={() => {
-                          setActivePage(item.id);
-                          if (setIsMobileOpen) setIsMobileOpen(false);
-                        }}
+                        onClick={() => handleNavClick(item.path)}
                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
                           isActive
                             ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'

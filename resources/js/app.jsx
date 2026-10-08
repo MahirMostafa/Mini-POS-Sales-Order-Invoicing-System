@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
@@ -17,24 +18,9 @@ import RolePermissionManagement from './pages/RolePermissionManagement';
 import AuditLogs from './pages/AuditLogs';
 import { Loader2 } from 'lucide-react';
 
-function MainApp() {
+function DashboardLayout() {
   const { user, role, loading } = useAuth();
-  const [activePage, setActivePage] = useState('pos');
-  const [activeOrderId, setActiveOrderId] = useState(null);
-  const [activeInvoiceId, setActiveInvoiceId] = useState(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  // Set default active page based on role upon login
-  useEffect(() => {
-    if (user) {
-      const userRole = role || user?.roles?.[0]?.name || 'Admin';
-      if (userRole === 'Accountant') {
-        setActivePage('accounting');
-      } else {
-        setActivePage('pos');
-      }
-    }
-  }, [user?.id, role]);
 
   if (loading) {
     return (
@@ -52,26 +38,13 @@ function MainApp() {
     return <LoginPage />;
   }
 
-  const handleNavigateToOrder = (orderId) => {
-    setActiveOrderId(orderId);
-    setActivePage('order-details');
-  };
-
-  const handleNavigateToInvoice = (invoiceId) => {
-    setActiveInvoiceId(invoiceId);
-    setActivePage('invoice-preview');
-  };
+  const userRole = role || user?.roles?.[0]?.name || 'Admin';
+  const defaultPath = userRole === 'Accountant' ? '/accounting' : '/pos';
 
   return (
     <div className="min-h-screen bg-slate-50 flex selection:bg-indigo-500 selection:text-white">
       {/* Left Modern Sidebar */}
       <Sidebar
-        activePage={activePage}
-        setActivePage={(page) => {
-          setActivePage(page);
-          setActiveOrderId(null);
-          setActiveInvoiceId(null);
-        }}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
       />
@@ -80,71 +53,44 @@ function MainApp() {
       <div className="flex-1 flex flex-col min-w-0 lg:pl-72">
         {/* Top Header */}
         <Header
-          activePage={activePage}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
         />
 
-        {/* Dynamic Page Views */}
+        {/* Dynamic Page Views with URL Routes */}
         <main className="flex-1 pb-12">
-          {activePage === 'pos' && (
-            <PosTerminal
-              onNavigateToInvoice={handleNavigateToInvoice}
-              onNavigateToOrder={handleNavigateToOrder}
-            />
-          )}
-
-          {activePage === 'orders' && (
-            <OrdersList
-              onNavigateToOrder={handleNavigateToOrder}
-              onNavigateToInvoice={handleNavigateToInvoice}
-            />
-          )}
-
-          {activePage === 'order-details' && (
-            <OrderDetails
-              orderId={activeOrderId}
-              onBack={() => setActivePage('orders')}
-              onNavigateToInvoice={handleNavigateToInvoice}
-            />
-          )}
-
-          {activePage === 'invoices' && (
-            <InvoicePreview
-              invoiceId={null}
-              onSelectInvoice={(id) => handleNavigateToInvoice(id)}
-            />
-          )}
-
-          {activePage === 'invoice-preview' && (
-            <InvoicePreview
-              invoiceId={activeInvoiceId}
-              onBack={() => setActivePage('invoices')}
-              onSelectInvoice={(id) => handleNavigateToInvoice(id)}
-            />
-          )}
-
-          {activePage === 'products' && <ProductCatalog />}
-
-          {activePage === 'purchases' && <PurchaseManagement />}
-
-          {activePage === 'accounting' && <AccountingDashboard />}
-
-          {activePage === 'taxes' && <TaxManagement />}
-
-          {activePage === 'users' && <UserManagement />}
-
-          {activePage === 'roles' && <RolePermissionManagement />}
-
-          {activePage === 'audit' && <AuditLogs />}
+          <Routes>
+            <Route path="/" element={<Navigate to={defaultPath} replace />} />
+            <Route path="/pos" element={<PosTerminal />} />
+            <Route path="/orders" element={<OrdersList />} />
+            <Route path="/orders/:id" element={<OrderDetails />} />
+            <Route path="/invoices" element={<InvoicePreview />} />
+            <Route path="/invoices/:id" element={<InvoicePreview />} />
+            <Route path="/products" element={<ProductCatalog />} />
+            <Route path="/purchases" element={<PurchaseManagement />} />
+            <Route path="/accounting" element={<AccountingDashboard />} />
+            <Route path="/taxes" element={<TaxManagement />} />
+            <Route path="/users" element={<UserManagement />} />
+            <Route path="/roles" element={<RolePermissionManagement />} />
+            <Route path="/audit" element={<AuditLogs />} />
+            <Route path="*" element={<Navigate to={defaultPath} replace />} />
+          </Routes>
         </main>
 
         {/* System Footer */}
         <footer className="no-print py-4 px-6 border-t border-slate-200 bg-white text-center sm:text-left text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Mini POS & Sales Order Invoicing System • Repository Pattern & Spatie RBAC</span>
+          <span>Mini POS & Sales Order Invoicing System • Clean Architecture & Spatie RBAC</span>
           <span className="font-semibold text-slate-500">Status: Active Database & Queue Worker</span>
         </footer>
       </div>
     </div>
+  );
+}
+
+function MainApp() {
+  return (
+    <BrowserRouter>
+      <DashboardLayout />
+    </BrowserRouter>
   );
 }
 

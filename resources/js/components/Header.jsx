@@ -1,38 +1,26 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Menu, UserCheck, ShieldCheck, Calculator, LogOut } from 'lucide-react';
+import { Menu, UserCheck, ShieldCheck, Calculator } from 'lucide-react';
 
-export default function Header({ activePage, onToggleMobileSidebar }) {
-  const { user, role, demoUsers, quickLogin, logout } = useAuth();
+export default function Header({ onToggleMobileSidebar }) {
+  const { user, role, demoUsers, quickLogin } = useAuth();
+  const location = useLocation();
 
-  const getPageTitle = (page) => {
-    switch (page) {
-      case 'pos':
-        return 'Point of Sale (POS)';
-      case 'orders':
-        return 'Sales Orders & Invoicing Workflow';
-      case 'order-details':
-        return 'Order Audit & Breakdown';
-      case 'invoices':
-      case 'invoice-preview':
-        return 'Tax Invoices & Printable Receipts';
-      case 'accounting':
-        return 'Double-Entry Accounting & Ledger';
-      case 'products':
-        return 'Product Catalog & Variant Stock Management';
-      case 'purchases':
-        return 'Purchase Orders & Stock Replenishment';
-      case 'taxes':
-        return 'Dynamic Tax Rates (VAT) Settings';
-      case 'users':
-        return 'User & Employee Management';
-      case 'roles':
-        return 'Spatie Role & Permissions Matrix';
-      case 'audit':
-        return 'Queued Audit Activity Logs';
-      default:
-        return 'Dashboard';
-    }
+  const getPageTitle = (pathname) => {
+    if (pathname.startsWith('/pos')) return 'Point of Sale (POS) Counter';
+    if (pathname.startsWith('/orders/')) return 'Order Audit & Breakdown';
+    if (pathname.startsWith('/orders')) return 'Sales Orders & Invoicing Workflow';
+    if (pathname.startsWith('/invoices/')) return 'Official Tax Invoice Preview';
+    if (pathname.startsWith('/invoices')) return 'Tax Invoices & Printable Receipts';
+    if (pathname.startsWith('/accounting')) return 'Double-Entry Accounting & Ledger';
+    if (pathname.startsWith('/products')) return 'Product Catalog & Variant Stock Management';
+    if (pathname.startsWith('/purchases')) return 'Purchase Orders & Stock Replenishment';
+    if (pathname.startsWith('/taxes')) return 'Dynamic Tax Rates (VAT) Settings';
+    if (pathname.startsWith('/users')) return 'User & Employee Management';
+    if (pathname.startsWith('/roles')) return 'Spatie Role & Permissions Matrix';
+    if (pathname.startsWith('/audit')) return 'Queued Audit Activity Logs';
+    return 'Dashboard';
   };
 
   const userRole = role || user?.roles?.[0]?.name || 'Admin';
@@ -51,7 +39,7 @@ export default function Header({ activePage, onToggleMobileSidebar }) {
 
         <div>
           <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-            {getPageTitle(activePage)}
+            {getPageTitle(location.pathname)}
           </h1>
           <p className="text-[11px] text-slate-400 hidden sm:block">
             Mini POS • Enterprise Clean Architecture System

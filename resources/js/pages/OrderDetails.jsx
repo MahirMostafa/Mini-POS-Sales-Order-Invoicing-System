@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import Swal from 'sweetalert2';
 import { 
@@ -19,7 +20,11 @@ import {
 } from 'lucide-react';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
-export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
+export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateToInvoice }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const effectiveOrderId = propOrderId || id;
+
   const [order, setOrder] = useState(null);
   const [stockCheck, setStockCheck] = useState({ is_available: true, items: [] });
   const [loading, setLoading] = useState(true);
@@ -27,10 +32,14 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
   const [completing, setCompleting] = useState(false);
   const currency = '৳';
 
+  const handleBack = onBack || (() => navigate('/orders'));
+  const handleNavigateInvoice = onNavigateToInvoice || ((invId) => navigate(`/invoices/${invId}`));
+
   const fetchOrderDetails = async () => {
+    if (!effectiveOrderId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/orders/${orderId}`);
+      const res = await api.get(`/orders/${effectiveOrderId}`);
       if (res.data.success) {
         setOrder(res.data.order);
         setStockCheck(res.data.stock_check || { is_available: true, items: [] });
@@ -43,15 +52,15 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
   };
 
   useEffect(() => {
-    if (orderId) {
+    if (effectiveOrderId) {
       fetchOrderDetails();
     }
-  }, [orderId]);
+  }, [effectiveOrderId]);
 
   const handleCompleteConfirm = async (paymentData) => {
     setCompleting(true);
     try {
-      const res = await api.post(`/orders/${orderId}/complete`, paymentData);
+      const res = await api.post(`/orders/${effectiveOrderId}/complete`, paymentData);
       if (res.data.success) {
         Swal.fire({
           icon: 'success',
@@ -63,7 +72,7 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
           confirmButtonColor: '#4f46e5',
         }).then((result) => {
           if (result.isConfirmed && res.data.invoice) {
-            onNavigateToInvoice?.(res.data.invoice.id);
+            handleNavigateInvoice(res.data.invoice.id);
           }
         });
 
@@ -90,7 +99,7 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
     return (
       <div className="p-16 text-center text-slate-500">
         <p>Order not found.</p>
-        <button onClick={onBack} className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white">
+        <button onClick={handleBack} className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white">
           Go Back
         </button>
       </div>
@@ -106,7 +115,7 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
       {/* Top Bar with Back button */}
       <div className="flex items-center justify-between">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Orders
@@ -115,7 +124,7 @@ export default function OrderDetails({ orderId, onBack, onNavigateToInvoice }) {
         <div className="flex items-center gap-2">
           {isCompleted && order.invoice && (
             <button
-              onClick={() => onNavigateToInvoice?.(order.invoice.id)}
+              onClick={() => handleNavigateInvoice(order.invoice.id)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
             >
               <FileText className="w-4 h-4" /> View Invoice #{order.invoice.invoice_number}

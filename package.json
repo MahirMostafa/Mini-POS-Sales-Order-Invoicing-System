@@ -6,7 +6,6 @@
         "build": "node ./node_modules/vite/bin/vite.js build",
         "dev": "node ./node_modules/vite/bin/vite.js"
     },
-
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
         "@vitejs/plugin-react": "^4.7.0",
@@ -23,6 +22,7 @@
         "lucide-react": "^1.53.0",
         "react": "^19.3.0",
         "react-dom": "^19.3.0",
+        "react-router-dom": "^7.18.4",
         "recharts": "^3.10.1",
         "sweetalert2": "^11.26.25",
         "tailwind-merge": "^3.7.0"
