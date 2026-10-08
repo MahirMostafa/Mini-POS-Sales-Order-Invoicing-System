@@ -17,17 +17,44 @@ class EloquentInvoiceRepository implements InvoiceRepositoryInterface
             $query->where('status', $filters['status']);
         }
 
+        if (!empty($filters['payment_status'])) {
+            if ($filters['payment_status'] === 'paid') {
+                $query->whereColumn('paid_amount', '>=', 'grand_total');
+            } elseif ($filters['payment_status'] === 'unpaid') {
+                $query->where('paid_amount', '<=', 0);
+            } elseif ($filters['payment_status'] === 'partially_paid') {
+                $query->where('paid_amount', '>', 0)
+                      ->whereColumn('paid_amount', '<', 'grand_total');
+            }
+        }
+
         if (!empty($filters['customer_id'])) {
             $query->where('customer_id', $filters['customer_id']);
+        }
+
+        if (!empty($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
+        }
+
+        if (!empty($filters['start_date'])) {
+            $query->whereDate('invoice_date', '>=', $filters['start_date']);
+        }
+
+        if (!empty($filters['end_date'])) {
+            $query->whereDate('invoice_date', '<=', $filters['end_date']);
         }
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
+                  ->orWhereHas('order', function ($oq) use ($search) {
+                      $oq->where('order_number', 'like', "%{$search}%");
+                  })
                   ->orWhereHas('customer', function ($cq) use ($search) {
                       $cq->where('name', 'like', "%{$search}%")
-                         ->orWhere('customer_code', 'like', "%{$search}%");
+                         ->orWhere('customer_code', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
                   });
             });
         }

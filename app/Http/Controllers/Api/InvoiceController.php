@@ -18,13 +18,24 @@ class InvoiceController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $user = auth()->user();
+
         $filters = [
             'status' => $request->get('status'),
+            'payment_status' => $request->get('payment_status'),
             'customer_id' => $request->get('customer_id'),
             'search' => $request->get('search'),
+            'start_date' => $request->get('start_date'),
+            'end_date' => $request->get('end_date'),
         ];
 
-        $invoices = $this->invoiceRepo->paginate($request->integer('per_page', 15), $filters);
+        // Non-admin and non-accountant roles only see their own sales receipts
+        if ($user && !$user->hasRole('Admin') && !$user->hasRole('Accountant')) {
+            $filters['user_id'] = $user->id;
+        }
+
+        $perPage = $request->integer('per_page', 10);
+        $invoices = $this->invoiceRepo->paginate($perPage, $filters);
 
         return response()->json([
             'success' => true,
