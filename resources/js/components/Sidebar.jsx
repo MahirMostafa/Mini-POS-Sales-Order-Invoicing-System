@@ -184,51 +184,6 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Current User Role Pill */}
-        <div className={isCollapsed ? 'px-3 pt-3 pb-1' : 'px-4 pt-3 pb-1'}>
-          {isCollapsed ? (
-            <div
-              className="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center relative cursor-default group"
-              title={`${user?.name || 'User'} • ${userRole}`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <span
-                className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                  userRole === 'Admin'
-                    ? 'bg-amber-500'
-                    : userRole === 'Accountant'
-                    ? 'bg-emerald-500'
-                    : 'bg-indigo-500'
-                }`}
-              />
-            </div>
-          ) : (
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-800 truncate">{user?.name || 'User'}</div>
-                  <div className="text-[10px] text-slate-400 truncate">{user?.email || 'user@example.com'}</div>
-                </div>
-              </div>
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
-                  userRole === 'Admin'
-                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                    : userRole === 'Accountant'
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                    : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                }`}
-              >
-                {userRole}
-              </span>
-            </div>
-          )}
-        </div>
 
         {/* Navigation Links */}
         <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 py-2 space-y-3' : 'px-4 py-2 space-y-5'}`}>
