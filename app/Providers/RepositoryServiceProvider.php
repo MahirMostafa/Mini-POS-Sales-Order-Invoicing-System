@@ -29,6 +29,8 @@ use App\Contracts\Repositories\PurchaseRepositoryInterface;
 use App\Repositories\EloquentPurchaseRepository;
 use App\Contracts\Repositories\UserRepositoryInterface;
 use App\Repositories\EloquentUserRepository;
+use App\Contracts\Repositories\BankAccountRepositoryInterface;
+use App\Repositories\EloquentBankAccountRepository;
 use App\Contracts\Repositories\RolePermissionRepositoryInterface;
 use App\Repositories\EloquentRolePermissionRepository;
 use App\Contracts\Repositories\SettingRepositoryInterface;
@@ -58,6 +60,7 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(OrderRepositoryInterface::class, EloquentOrderRepository::class);
         $this->app->bind(InvoiceRepositoryInterface::class, EloquentInvoiceRepository::class);
         $this->app->bind(AccountingRepositoryInterface::class, EloquentAccountingRepository::class);
+        $this->app->bind(BankAccountRepositoryInterface::class, EloquentBankAccountRepository::class);
         $this->app->bind(TaxRateRepositoryInterface::class, EloquentTaxRateRepository::class);
         $this->app->bind(StockMovementRepositoryInterface::class, EloquentStockMovementRepository::class);
         $this->app->bind(AuditLogRepositoryInterface::class, EloquentAuditLogRepository::class);

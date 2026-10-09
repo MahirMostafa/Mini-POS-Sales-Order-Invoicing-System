@@ -13,6 +13,7 @@ class JournalItem extends Model
     protected $fillable = [
         'journal_entry_id',
         'account_id',
+        'bank_account_id',
         'debit',
         'credit',
         'narration',
@@ -34,5 +35,10 @@ class JournalItem extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(ChartOfAccount::class, 'account_id');
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class, 'bank_account_id');
     }
 }

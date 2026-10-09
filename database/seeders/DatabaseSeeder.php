@@ -11,11 +11,12 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             ChartOfAccountsSeeder::class,
+            BankAccountsSeeder::class,
             TaxRatesSeeder::class,
             SettingsSeeder::class,
             CustomersSeeder::class,
-            ProductCategoriesAndProductsSeeder::class,
             UsersSeeder::class,
+            ProductCategoriesAndProductsSeeder::class,
         ]);
     }
 }
