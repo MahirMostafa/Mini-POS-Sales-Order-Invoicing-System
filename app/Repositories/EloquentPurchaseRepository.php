@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Contracts\Repositories\PurchaseRepositoryInterface;
+use App\Contracts\Services\AccountingServiceInterface;
 use App\Contracts\Services\InventoryServiceInterface;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -14,13 +15,14 @@ use Illuminate\Support\Facades\DB;
 class EloquentPurchaseRepository implements PurchaseRepositoryInterface
 {
     public function __construct(
-        protected InventoryServiceInterface $inventoryService
+        protected InventoryServiceInterface $inventoryService,
+        protected AccountingServiceInterface $accountingService
     ) {
     }
 
     public function paginate(int $perPage = 15, array $filters = []): LengthAwarePaginator
     {
-        $query = Purchase::with(['items.variant.product', 'user', 'receivedBy']);
+        $query = Purchase::with(['items.variant.product', 'user', 'receivedBy', 'bankAccount']);
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -53,7 +55,7 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
 
     public function findById(int $id): ?Purchase
     {
-        return Purchase::with(['items.variant.product', 'user', 'receivedBy'])->find($id);
+        return Purchase::with(['items.variant.product', 'user', 'receivedBy', 'bankAccount'])->find($id);
     }
 
     public function getSummary(array $filters = []): array
@@ -121,6 +123,8 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                 'total_amount' => $totalAmount,
                 'paid_amount' => $purchaseData['paid_amount'] ?? $totalAmount,
                 'payment_method' => $purchaseData['payment_method'],
+                'bank_account_id' => $purchaseData['bank_account_id'] ?? null,
+                'chart_of_account_id' => $purchaseData['chart_of_account_id'] ?? null,
                 'notes' => $purchaseData['notes'] ?? null,
                 'user_id' => $userId,
                 'received_by_user_id' => $isReceived ? $userId : null,
@@ -151,7 +155,12 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                 }
             }
 
-            return $purchase->load(['items.variant.product', 'user', 'receivedBy']);
+            // Post Balanced Double-Entry Journal Entry if received immediately
+            if ($isReceived) {
+                $this->accountingService->recordPurchaseJournalEntry($purchase);
+            }
+
+            return $purchase->load(['items.variant.product', 'user', 'receivedBy', 'bankAccount']);
         });
     }
 
@@ -183,7 +192,10 @@ class EloquentPurchaseRepository implements PurchaseRepositoryInterface
                 );
             }
 
-            return $purchase->fresh(['items.variant.product', 'user', 'receivedBy']);
+            // Post Balanced Double-Entry Journal Entry on receipt
+            $this->accountingService->recordPurchaseJournalEntry($purchase);
+
+            return $purchase->fresh(['items.variant.product', 'user', 'receivedBy', 'bankAccount']);
         });
     }
 }

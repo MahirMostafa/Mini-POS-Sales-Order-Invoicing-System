@@ -78,6 +78,7 @@ export default function PurchaseManagement() {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [lastScannedVariantId, setLastScannedVariantId] = useState(null);
 
   const barcodeInputRef = useRef(null);
@@ -91,6 +92,7 @@ export default function PurchaseManagement() {
     purchase_date: new Date().toISOString().split('T')[0],
     status: 'pending', // default to pending per user request
     payment_method: 'bank_transfer',
+    bank_account_id: '',
     notes: '',
     items: []
   });
@@ -201,8 +203,13 @@ export default function PurchaseManagement() {
         setVariantsList(allVars);
       }
 
-      if (resPosInit.status === 'fulfilled' && resPosInit.value.data.company) {
-        setCompany(resPosInit.value.data.company);
+      if (resPosInit.status === 'fulfilled') {
+        if (resPosInit.value.data.company) {
+          setCompany(resPosInit.value.data.company);
+        }
+        if (resPosInit.value.data.bank_accounts) {
+          setBankAccounts(resPosInit.value.data.bank_accounts);
+        }
       }
 
       if (resMe.status === 'fulfilled' && resMe.value.data.user) {
@@ -246,6 +253,7 @@ export default function PurchaseManagement() {
       purchase_date: new Date().toISOString().split('T')[0],
       status: 'pending',
       payment_method: 'bank_transfer',
+      bank_account_id: bankAccounts.length > 0 ? String(bankAccounts[0].id) : '',
       notes: '',
       items: []
     });
@@ -401,6 +409,7 @@ export default function PurchaseManagement() {
 
     setSubmitting(true);
     try {
+      const isBank = formData.payment_method === 'bank_transfer' || formData.payment_method === 'card';
       const payload = {
         supplier_name: formData.supplier_name.trim(),
         supplier_phone: formData.supplier_phone.trim() || null,
@@ -408,6 +417,7 @@ export default function PurchaseManagement() {
         purchase_date: formData.purchase_date,
         status: formData.status || 'pending',
         payment_method: formData.payment_method,
+        bank_account_id: isBank && formData.bank_account_id ? Number(formData.bank_account_id) : null,
         notes: formData.notes.trim() || null,
         items: formData.items.map((it) => ({
           product_variant_id: it.product_variant_id,
@@ -1031,7 +1041,14 @@ export default function PurchaseManagement() {
 
                 {/* Payment Method */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Payment Method</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-700">Payment Source</label>
+                    <span className="text-[10px] font-mono text-indigo-600 font-bold">
+                      {formData.payment_method === 'cash' && 'CR: [1010] Cash in Hand'}
+                      {(formData.payment_method === 'bank_transfer' || formData.payment_method === 'card') && 'CR: Bank Accounts'}
+                      {formData.payment_method === 'credit' && 'CR: [2020] Accounts Payable'}
+                    </span>
+                  </div>
                   <div className="relative">
                     <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <select
@@ -1039,13 +1056,31 @@ export default function PurchaseManagement() {
                       onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
                       className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 bg-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-medium"
                     >
-                      <option value="bank_transfer">Bank Transfer</option>
-                      <option value="cash">Cash Counter</option>
+                      <option value="bank_transfer">Bank Transfer / Digital</option>
+                      <option value="cash">Cash in Hand</option>
                       <option value="card">Corporate Card</option>
-                      <option value="credit">Supplier Credit (Accounts Payable)</option>
+                      <option value="credit">Supplier Credit (Accounts Payable [2020])</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Specific Bank Account Selector */}
+                {(formData.payment_method === 'bank_transfer' || formData.payment_method === 'card') && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Disbursing Bank Account</label>
+                    <select
+                      value={formData.bank_account_id}
+                      onChange={(e) => setFormData({ ...formData, bank_account_id: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-indigo-300 text-xs font-bold text-slate-900 bg-indigo-50/50 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                    >
+                      {bankAccounts.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.bank_name} - {b.account_name} (Ac: {b.account_number}) • Bal: ৳{Number(b.current_balance || 0).toFixed(2)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* Remarks & Notes */}
                 <div className="sm:col-span-2 lg:col-span-3">

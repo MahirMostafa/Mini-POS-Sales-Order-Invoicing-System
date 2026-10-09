@@ -9,7 +9,8 @@ import PosTerminal from './pages/PosTerminal';
 import OrdersList from './pages/OrdersList';
 import OrderDetails from './pages/OrderDetails';
 import InvoicePreview from './pages/InvoicePreview';
-import AccountingDashboard from './pages/AccountingDashboard';
+import CashManagement from './pages/CashManagement';
+import BankManagement from './pages/BankManagement';
 import ProductCatalog from './pages/ProductCatalog';
 import CategoryManagement from './pages/CategoryManagement';
 import PurchaseManagement from './pages/PurchaseManagement';
@@ -18,19 +19,32 @@ import UserManagement from './pages/UserManagement';
 import CustomerManagement from './pages/CustomerManagement';
 import RolePermissionManagement from './pages/RolePermissionManagement';
 import AuditLogs from './pages/AuditLogs';
+
+// Standalone Accounting Report Pages
+import ReportsOverview from './pages/reports/ReportsOverview';
+import ChartOfAccountsPage from './pages/reports/ChartOfAccountsPage';
+import CashBookReport from './pages/reports/CashBookReport';
+import BankBookReport from './pages/reports/BankBookReport';
+import DayBookReport from './pages/reports/DayBookReport';
+import GeneralLedgerReport from './pages/reports/GeneralLedgerReport';
+import JournalEntriesReport from './pages/reports/JournalEntriesReport';
+import TrialBalanceReport from './pages/reports/TrialBalanceReport';
+import ProfitLossReport from './pages/reports/ProfitLossReport';
+import BalanceSheetReport from './pages/reports/BalanceSheetReport';
+
 import { Loader2, ShieldAlert } from 'lucide-react';
 
-function ProtectedRoute({ children, allowedRoles = [], requiredPermissions = [] }) {
-  const { user, role, canAccessRoute } = useAuth();
+function ProtectedRoute({ children, requiredPermissions = [] }) {
+  const { user, role, hasPermission } = useAuth();
 
   if (!user) {
     return <LoginPage />;
   }
 
-  const hasAccess = canAccessRoute(allowedRoles, requiredPermissions);
+  const hasAccess = hasPermission(requiredPermissions);
 
   if (!hasAccess) {
-    const defaultFallback = role === 'Accountant' ? '/accounting' : '/pos';
+    const defaultFallback = hasPermission(['view-pos']) ? '/pos' : (hasPermission(['view-accounting-dashboard']) ? '/accounts/reports' : '/pos');
     return (
       <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-3xl border border-rose-200 shadow-xl text-center space-y-4">
         <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
@@ -38,7 +52,7 @@ function ProtectedRoute({ children, allowedRoles = [], requiredPermissions = [] 
         </div>
         <h2 className="text-lg font-black text-slate-900">Access Denied (RBAC Restricted)</h2>
         <p className="text-xs text-slate-500">
-          Your current role (<span className="font-bold text-slate-800">{role || 'User'}</span>) does not have the required Spatie permissions to view or perform operations in this module.
+          Your current account does not have the required Spatie permission to view or perform operations in this module.
         </p>
         <div className="pt-2">
           <Navigate to={defaultFallback} replace />
@@ -82,7 +96,7 @@ function DashboardLayout() {
   }
 
   const userRole = role || user?.roles?.[0]?.name || 'Admin';
-  const defaultPath = userRole === 'Accountant' ? '/accounting' : '/pos';
+  const defaultPath = userRole === 'Accountant' ? '/accounts/reports' : '/pos';
 
   return (
     <div className="min-h-screen bg-slate-50 flex selection:bg-indigo-500 selection:text-white">
@@ -108,7 +122,7 @@ function DashboardLayout() {
         />
 
         {/* Dynamic Page Views with Protected Spatie Routes */}
-        <main className="flex-1 pb-12">
+        <main className="flex-1 pb-12 px-4 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
           <Routes>
             <Route path="/" element={<Navigate to={defaultPath} replace />} />
 
@@ -116,7 +130,7 @@ function DashboardLayout() {
             <Route
               path="/pos"
               element={
-                <ProtectedRoute allowedRoles={['Admin', 'Cashier']} requiredPermissions={['view-pos']}>
+                <ProtectedRoute requiredPermissions={['view-pos']}>
                   <PosTerminal />
                 </ProtectedRoute>
               }
@@ -125,10 +139,7 @@ function DashboardLayout() {
             <Route
               path="/orders"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
-                  requiredPermissions={['create-order', 'complete-order', 'view-pos']}
-                >
+                <ProtectedRoute requiredPermissions={['create-order', 'complete-order']}>
                   <OrdersList />
                 </ProtectedRoute>
               }
@@ -137,10 +148,7 @@ function DashboardLayout() {
             <Route
               path="/orders/:id"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
-                  requiredPermissions={['create-order', 'complete-order', 'view-pos']}
-                >
+                <ProtectedRoute requiredPermissions={['create-order', 'complete-order']}>
                   <OrderDetails />
                 </ProtectedRoute>
               }
@@ -149,10 +157,7 @@ function DashboardLayout() {
             <Route
               path="/invoices"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
-                  requiredPermissions={['view-invoices', 'print-invoices']}
-                >
+                <ProtectedRoute requiredPermissions={['view-invoices', 'print-invoices']}>
                   <InvoicePreview />
                 </ProtectedRoute>
               }
@@ -161,10 +166,7 @@ function DashboardLayout() {
             <Route
               path="/invoices/:id"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
-                  requiredPermissions={['view-invoices', 'print-invoices']}
-                >
+                <ProtectedRoute requiredPermissions={['view-invoices', 'print-invoices']}>
                   <InvoicePreview />
                 </ProtectedRoute>
               }
@@ -173,10 +175,7 @@ function DashboardLayout() {
             <Route
               path="/customers"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Cashier', 'Accountant']}
-                  requiredPermissions={['view-customers', 'manage-customers']}
-                >
+                <ProtectedRoute requiredPermissions={['view-customers', 'manage-customers']}>
                   <CustomerManagement />
                 </ProtectedRoute>
               }
@@ -186,7 +185,7 @@ function DashboardLayout() {
             <Route
               path="/categories"
               element={
-                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['manage-categories', 'view-categories']}>
+                <ProtectedRoute requiredPermissions={['manage-categories', 'view-categories']}>
                   <CategoryManagement />
                 </ProtectedRoute>
               }
@@ -195,7 +194,7 @@ function DashboardLayout() {
             <Route
               path="/products"
               element={
-                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['manage-products']}>
+                <ProtectedRoute requiredPermissions={['manage-products']}>
                   <ProductCatalog />
                 </ProtectedRoute>
               }
@@ -204,39 +203,159 @@ function DashboardLayout() {
             <Route
               path="/purchases"
               element={
-                <ProtectedRoute allowedRoles={['Admin', 'Accountant']} requiredPermissions={['manage-purchases']}>
+                <ProtectedRoute requiredPermissions={['manage-purchases', 'receive-purchases']}>
                   <PurchaseManagement />
                 </ProtectedRoute>
               }
             />
 
-            {/* Finance & Accounting */}
+            {/* Accounts, Cash & Bank Routes */}
             <Route
-              path="/accounting"
+              path="/accounts/cash"
               element={
-                <ProtectedRoute
-                  allowedRoles={['Admin', 'Accountant']}
-                  requiredPermissions={['view-accounting-dashboard', 'view-ledger', 'view-journal-entries']}
-                >
-                  <AccountingDashboard />
+                <ProtectedRoute requiredPermissions={['view-cash-book', 'manage-cash-book']}>
+                  <CashManagement />
                 </ProtectedRoute>
               }
             />
 
             <Route
+              path="/cash"
+              element={<Navigate to="/accounts/cash" replace />}
+            />
+
+            <Route
+              path="/accounts/banks"
+              element={
+                <ProtectedRoute requiredPermissions={['view-banks', 'view-bank-book', 'manage-banks']}>
+                  <BankManagement />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/banks"
+              element={<Navigate to="/accounts/banks" replace />}
+            />
+
+            {/* Standalone Separate Accounting Report Pages */}
+            <Route
+              path="/accounts/reports"
+              element={
+                <ProtectedRoute requiredPermissions={['view-accounting-dashboard', 'view-chart-of-accounts', 'view-cash-book', 'view-bank-book', 'view-day-book', 'view-ledger', 'view-journal-entries', 'view-trial-balance', 'view-profit-loss', 'view-balance-sheet']}>
+                  <ReportsOverview />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/chart-of-accounts"
+              element={
+                <ProtectedRoute requiredPermissions={['view-chart-of-accounts', 'manage-chart-of-accounts', 'view-accounting-dashboard']}>
+                  <ChartOfAccountsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/cash-book"
+              element={
+                <ProtectedRoute requiredPermissions={['view-cash-book', 'manage-cash-book', 'view-accounting-dashboard']}>
+                  <CashBookReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/bank-book"
+              element={
+                <ProtectedRoute requiredPermissions={['view-bank-book', 'view-banks', 'manage-banks', 'view-accounting-dashboard']}>
+                  <BankBookReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/day-book"
+              element={
+                <ProtectedRoute requiredPermissions={['view-day-book', 'view-accounting-dashboard']}>
+                  <DayBookReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/general-ledger"
+              element={
+                <ProtectedRoute requiredPermissions={['view-ledger', 'view-accounting-dashboard']}>
+                  <GeneralLedgerReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/journal-entries"
+              element={
+                <ProtectedRoute requiredPermissions={['view-journal-entries', 'view-accounting-dashboard']}>
+                  <JournalEntriesReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/trial-balance"
+              element={
+                <ProtectedRoute requiredPermissions={['view-trial-balance', 'view-accounting-dashboard']}>
+                  <TrialBalanceReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/profit-loss"
+              element={
+                <ProtectedRoute requiredPermissions={['view-profit-loss', 'view-accounting-dashboard']}>
+                  <ProfitLossReport />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/accounts/reports/balance-sheet"
+              element={
+                <ProtectedRoute requiredPermissions={['view-balance-sheet', 'view-accounting-dashboard']}>
+                  <BalanceSheetReport />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Quick Redirects & Aliases */}
+            <Route path="/accounting" element={<Navigate to="/accounts/reports" replace />} />
+            <Route path="/accounts/chart-of-accounts" element={<Navigate to="/accounts/reports/chart-of-accounts" replace />} />
+            <Route path="/accounts/cash-book" element={<Navigate to="/accounts/reports/cash-book" replace />} />
+            <Route path="/accounts/bank-book" element={<Navigate to="/accounts/reports/bank-book" replace />} />
+            <Route path="/accounts/day-book" element={<Navigate to="/accounts/reports/day-book" replace />} />
+            <Route path="/accounts/general-ledger" element={<Navigate to="/accounts/reports/general-ledger" replace />} />
+            <Route path="/accounts/ledger" element={<Navigate to="/accounts/reports/general-ledger" replace />} />
+            <Route path="/accounts/journal-entries" element={<Navigate to="/accounts/reports/journal-entries" replace />} />
+            <Route path="/accounts/trial-balance" element={<Navigate to="/accounts/reports/trial-balance" replace />} />
+            <Route path="/accounts/profit-loss" element={<Navigate to="/accounts/reports/profit-loss" replace />} />
+            <Route path="/accounts/balance-sheet" element={<Navigate to="/accounts/reports/balance-sheet" replace />} />
+
+            <Route
               path="/taxes"
               element={
-                <ProtectedRoute allowedRoles={['Admin', 'Accountant']} requiredPermissions={['manage-tax-rates']}>
+                <ProtectedRoute requiredPermissions={['manage-tax-rates']}>
                   <TaxManagement />
                 </ProtectedRoute>
               }
             />
 
-            {/* Admin Only Routes */}
+            {/* Administration Routes */}
             <Route
               path="/users"
               element={
-                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['manage-users']}>
+                <ProtectedRoute requiredPermissions={['manage-users']}>
                   <UserManagement />
                 </ProtectedRoute>
               }
@@ -245,7 +364,7 @@ function DashboardLayout() {
             <Route
               path="/roles"
               element={
-                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['manage-roles']}>
+                <ProtectedRoute requiredPermissions={['manage-roles']}>
                   <RolePermissionManagement />
                 </ProtectedRoute>
               }
@@ -254,40 +373,32 @@ function DashboardLayout() {
             <Route
               path="/audit"
               element={
-                <ProtectedRoute allowedRoles={['Admin']} requiredPermissions={['view-audit-logs']}>
+                <ProtectedRoute requiredPermissions={['view-audit-logs']}>
                   <AuditLogs />
                 </ProtectedRoute>
               }
             />
 
+            {/* Fallback */}
             <Route path="*" element={<Navigate to={defaultPath} replace />} />
           </Routes>
         </main>
-
-        {/* System Footer */}
-        <footer className="no-print py-4 px-6 border-t border-slate-200 bg-white text-center sm:text-left text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>Mini POS & Sales Order Invoicing System •</span>
-        </footer>
       </div>
     </div>
   );
 }
 
-function MainApp() {
+export default function App() {
   return (
     <BrowserRouter>
-      <DashboardLayout />
+      <AuthProvider>
+        <DashboardLayout />
+      </AuthProvider>
     </BrowserRouter>
   );
 }
 
-const rootElement = document.getElementById('root');
+const rootElement = document.getElementById('root') || document.getElementById('app');
 if (rootElement) {
-  createRoot(rootElement).render(
-    <React.StrictMode>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
-    </React.StrictMode>
-  );
+  createRoot(rootElement).render(<App />);
 }

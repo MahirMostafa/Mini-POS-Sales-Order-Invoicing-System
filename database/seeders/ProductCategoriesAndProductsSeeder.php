@@ -264,5 +264,51 @@ class ProductCategoriesAndProductsSeeder extends Seeder
                 'is_active' => true,
             ]
         );
+
+        // 7. Establish Double-Entry Accounting Asset Records & Stock Movement Ledger for Seeded Inventory
+        $admin = \App\Models\User::first();
+        $userId = $admin ? $admin->id : 1;
+        $accountingService = app(\App\Contracts\Services\AccountingServiceInterface::class);
+
+        $variants = ProductVariant::with('product')->get();
+        foreach ($variants as $v) {
+            if ($v->stock_quantity > 0) {
+                // Post balanced Journal Entry (Debit: 1060 Merchandise Inventory Asset, Credit: 3010 Owner's Capital Equity)
+                $alreadyJournaled = \App\Models\JournalEntry::where('reference_type', 'OpeningStock')
+                    ->where('reference_id', $v->id)
+                    ->exists();
+
+                if (!$alreadyJournaled) {
+                    $accountingService->recordOpeningStockJournalEntry(
+                        $v,
+                        $v->stock_quantity,
+                        (float) $v->cost_price,
+                        $userId,
+                        'Initial seed stock asset valuation'
+                    );
+                }
+
+                // Log stock movement audit trail
+                $hasMovement = \App\Models\StockMovement::where('product_variant_id', $v->id)
+                    ->where('type', 'IN')
+                    ->exists();
+
+                if (!$hasMovement) {
+                    \App\Models\StockMovement::create([
+                        'product_id' => $v->product_id,
+                        'product_variant_id' => $v->id,
+                        'order_id' => null,
+                        'user_id' => $userId,
+                        'type' => 'IN',
+                        'quantity' => $v->stock_quantity,
+                        'stock_before' => 0,
+                        'stock_after' => $v->stock_quantity,
+                        'unit_cost' => $v->cost_price,
+                        'reference_number' => 'INIT-SEED-' . $v->sku,
+                        'notes' => "Initial seed inventory allocation for {$v->fullName}",
+                    ]);
+                }
+            }
+        }
     }
 }

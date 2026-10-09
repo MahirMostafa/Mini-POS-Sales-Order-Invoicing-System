@@ -19,7 +19,7 @@ interface OrderServiceInterface
     /**
      * Complete an order: verifies stock, deducts inventory, generates invoice, and posts double-entry journal entry
      */
-    public function completeOrder(Order $order, ?float $paidAmount = null, ?string $paymentMethod = null): array;
+    public function completeOrder(Order $order, ?float $paidAmount = null, ?string $paymentMethod = null, ?int $bankAccountId = null): array;
 
     /**
      * Cancel a pending order

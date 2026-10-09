@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\InvoiceController;
@@ -52,12 +53,39 @@ Route::prefix('invoices')->group(function () {
     Route::get('/{id}', [InvoiceController::class, 'show']);
 });
 
-// Accounting Module & Dashboard
+// Accounting Module & Financial Books
 Route::prefix('accounting')->group(function () {
     Route::get('/dashboard', [AccountingController::class, 'dashboard']);
+    Route::get('/stock-metrics', [AccountingController::class, 'stockMetrics']);
+    Route::get('/stock-valuation', [AccountingController::class, 'stockMetrics']);
     Route::get('/journal-entries', [AccountingController::class, 'journalEntries']);
+    Route::get('/cash-book', [AccountingController::class, 'cashBook']);
+    Route::get('/bank-book', [AccountingController::class, 'bankBook']);
+    Route::get('/day-book', [AccountingController::class, 'dayBook']);
     Route::get('/trial-balance', [AccountingController::class, 'trialBalance']);
+    Route::get('/balance-sheet', [AccountingController::class, 'balanceSheet']);
+    Route::get('/profit-loss', [AccountingController::class, 'profitLoss']);
     Route::get('/ledger/{accountId}', [AccountingController::class, 'ledger']);
+    Route::get('/accounts', [AccountingController::class, 'accounts']);
+    Route::get('/chart-of-accounts', [AccountingController::class, 'accounts']);
+    Route::post('/accounts', [AccountingController::class, 'storeAccount']);
+    Route::put('/accounts/{id}', [AccountingController::class, 'updateAccount']);
+    Route::delete('/accounts/{id}', [AccountingController::class, 'deleteAccount']);
+    Route::post('/vouchers', [AccountingController::class, 'storeVoucher']);
+    Route::post('/cash/add-money', [AccountingController::class, 'addCashMoney']);
+    Route::post('/cash/withdraw-money', [AccountingController::class, 'withdrawCashMoney']);
+});
+
+// Bank Accounts Management
+Route::prefix('bank-accounts')->group(function () {
+    Route::get('/', [BankAccountController::class, 'index']);
+    Route::post('/', [BankAccountController::class, 'store']);
+    Route::get('/{id}', [BankAccountController::class, 'show']);
+    Route::put('/{id}', [BankAccountController::class, 'update']);
+    Route::post('/{id}/toggle-status', [BankAccountController::class, 'toggleStatus']);
+    Route::post('/{id}/add-money', [BankAccountController::class, 'addMoney']);
+    Route::post('/{id}/withdraw-money', [BankAccountController::class, 'withdrawMoney']);
+    Route::delete('/{id}', [BankAccountController::class, 'destroy']);
 });
 
 // User Management

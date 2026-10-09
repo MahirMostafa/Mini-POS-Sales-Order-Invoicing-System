@@ -1,34 +1,39 @@
 import React, { useState, useEffect, useRef } from 'react';
+import api from '../api/client';
 import { 
   Banknote, 
   CreditCard, 
-  Building2, 
   Clock, 
   X, 
   Check, 
-  ArrowRight,
-  Calculator,
-  RefreshCw
+  Calculator, 
+  RefreshCw, 
+  Landmark 
 } from 'lucide-react';
 
 export default function PosPaymentModal({
   isOpen,
-  grandTotal,
-  rawTotal,
+  grandTotal = 0,
+  rawTotal = 0,
   roundingAdjustment = 0,
-  subtotal,
-  taxAmount,
-  discountAmount,
-  customer,
-  itemCount,
+  subtotal = 0,
+  taxAmount = 0,
+  discountAmount = 0,
+  customer = null,
+  itemCount = 0,
+  orderNumber = null,
+  title = null,
   currency = '৳',
+  bankAccounts = [],
   onClose,
   onConfirmPayment,
   submitting = false,
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'card' | 'bank_transfer' | 'credit'
+  const [selectedBankId, setSelectedBankId] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
+  const [internalBankAccounts, setInternalBankAccounts] = useState(bankAccounts || []);
   const inputRef = useRef(null);
 
   const isWalkIn = Boolean(
@@ -40,12 +45,39 @@ export default function PosPaymentModal({
     customer.name?.toLowerCase().includes('cash customer')
   );
 
+  const isExactOnly = paymentMethod === 'card' || paymentMethod === 'bank_transfer';
+
+  // Fetch or sync bank accounts
+  useEffect(() => {
+    if (bankAccounts && bankAccounts.length > 0) {
+      setInternalBankAccounts(bankAccounts);
+      if (!selectedBankId) {
+        setSelectedBankId(bankAccounts[0].id);
+      }
+    } else if (isOpen) {
+      api.get('/bank-accounts?active_only=1')
+        .then((res) => {
+          if (res.data?.success) {
+            const list = res.data.data || [];
+            setInternalBankAccounts(list);
+            if (list.length > 0 && !selectedBankId) {
+              setSelectedBankId(list[0].id);
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to load bank accounts', err));
+    }
+  }, [bankAccounts, isOpen]);
+
   // When modal opens, initialize paidAmount with grandTotal
   useEffect(() => {
     if (isOpen) {
-      setPaidAmount(grandTotal.toFixed(2));
+      setPaidAmount(Number(grandTotal || 0).toFixed(2));
       setPaymentMethod('cash');
       setPaymentNote('');
+      if (internalBankAccounts.length > 0 && !selectedBankId) {
+        setSelectedBankId(internalBankAccounts[0].id);
+      }
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -59,17 +91,19 @@ export default function PosPaymentModal({
   useEffect(() => {
     if (isWalkIn && paymentMethod === 'credit') {
       setPaymentMethod('cash');
-      setPaidAmount(grandTotal.toFixed(2));
+      setPaidAmount(Number(grandTotal || 0).toFixed(2));
     }
   }, [isWalkIn, paymentMethod, grandTotal]);
 
   if (!isOpen) return null;
 
-  const numericPaid = parseFloat(paidAmount) || 0;
-  const changeDue = numericPaid > grandTotal ? numericPaid - grandTotal : 0;
-  const balanceDue = numericPaid < grandTotal ? grandTotal - numericPaid : 0;
+  const currentNumericTotal = Number(grandTotal || 0);
+  const numericPaid = isExactOnly ? currentNumericTotal : (parseFloat(paidAmount) || 0);
+  const changeDue = numericPaid > currentNumericTotal ? numericPaid - currentNumericTotal : 0;
+  const balanceDue = numericPaid < currentNumericTotal ? currentNumericTotal - numericPaid : 0;
 
   const handleQuickAdd = (amount) => {
+    if (isExactOnly) return;
     setPaidAmount((prev) => {
       const current = parseFloat(prev) || 0;
       return (current + amount).toFixed(2);
@@ -77,43 +111,48 @@ export default function PosPaymentModal({
   };
 
   const handleSetExact = () => {
-    setPaidAmount(grandTotal.toFixed(2));
-  };
-
-  const handlePresetNote = (note) => {
-    setPaymentNote(note);
+    setPaidAmount(currentNumericTotal.toFixed(2));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (submitting) return;
 
-    if (isWalkIn && (paymentMethod === 'credit' || numericPaid < grandTotal)) {
-      alert(`Credit/Due sales are not allowed for Walk-in Customers. Please collect the full amount (${currency}${grandTotal.toFixed(2)}) or select a registered customer.`);
+    const finalPaid = isExactOnly ? currentNumericTotal : numericPaid;
+
+    if (isWalkIn && (paymentMethod === 'credit' || finalPaid < currentNumericTotal)) {
+      alert(`Credit/Due sales are not allowed for Walk-in Customers. Please collect the full amount (${currency}${currentNumericTotal.toFixed(2)}) or select a registered customer.`);
       return;
     }
 
+    const isBankPayment = paymentMethod === 'card' || paymentMethod === 'bank_transfer';
+    const chosenBankId = isBankPayment && selectedBankId ? Number(selectedBankId) : null;
+
     onConfirmPayment({
-      paid_amount: numericPaid,
+      paid_amount: finalPaid,
       payment_method: paymentMethod,
+      bank_account_id: chosenBankId,
       payment_note: paymentNote,
-      change_amount: changeDue,
+      change_amount: isExactOnly ? 0 : changeDue,
     });
   };
 
   const paymentMethods = [
-    { id: 'cash', label: 'Cash', icon: Banknote, color: 'emerald' },
-    { id: 'card', label: 'Card / POS', icon: CreditCard, color: 'indigo' },
-    { id: 'bank_transfer', label: 'Bank / Digital', icon: Building2, color: 'blue' },
+    { id: 'cash', label: 'Cash in Hand', head: '1010 Cash in Hand', icon: Banknote, color: 'emerald' },
+    { id: 'card', label: 'Card / POS', head: '1020 Bank / Card', icon: CreditCard, color: 'indigo' },
+    { id: 'bank_transfer', label: 'Bank / Transfer', head: '1020 Bank Accounts', icon: Landmark, color: 'blue' },
     { 
       id: 'credit', 
       label: isWalkIn ? 'Credit (Disabled)' : 'Credit / Due', 
+      head: '1050 Accounts Rec.',
       icon: Clock, 
       color: 'amber',
       disabled: isWalkIn,
       tooltip: isWalkIn ? 'Credit sales are only permitted for registered customer accounts' : 'Sell on credit / due'
     },
   ];
+
+  const selectedBankObj = internalBankAccounts.find((b) => b.id === Number(selectedBankId));
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -122,13 +161,19 @@ export default function PosPaymentModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
               <Calculator className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-slate-900">Collect POS Payment</h3>
+              <h3 className="font-bold text-sm text-slate-900">
+                {title || 'Collect POS Payment & Accounting Head'}
+              </h3>
               <p className="text-[10px] text-slate-500">
-                Customer: <span className="font-bold text-slate-700">{customer?.name || 'Walk-in Customer'}</span> • {itemCount} item(s)
+                {orderNumber ? (
+                  <>Order <span className="font-bold text-slate-700">#{orderNumber}</span> • Customer: <span className="font-bold text-slate-700">{customer?.name || 'Walk-in Customer'}</span></>
+                ) : (
+                  <>Customer: <span className="font-bold text-slate-700">{customer?.name || 'Walk-in Customer'}</span> • {itemCount} item(s)</>
+                )}
               </p>
             </div>
           </div>
@@ -137,7 +182,7 @@ export default function PosPaymentModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -152,28 +197,38 @@ export default function PosPaymentModal({
                 Total Payable Amount
               </span>
               <div className="text-2xl sm:text-3xl font-black text-indigo-600 tracking-tight">
-                {currency}{grandTotal.toFixed(2)}
+                {currency}{currentNumericTotal.toFixed(2)}
               </div>
             </div>
             <div className="text-right text-[11px] text-slate-500 space-y-0.5">
-              <div>Subtotal: <span className="font-bold text-slate-700">{currency}{subtotal.toFixed(2)}</span></div>
-              {discountAmount > 0 && (
-                <div className="text-rose-600">Discount: -{currency}{discountAmount.toFixed(2)}</div>
+              <div>Subtotal: <span className="font-bold text-slate-700">{currency}{Number(subtotal || 0).toFixed(2)}</span></div>
+              {Number(discountAmount) > 0 && (
+                <div className="text-rose-600">Discount: -{currency}{Number(discountAmount).toFixed(2)}</div>
               )}
-              {taxAmount > 0 && (
-                <div>VAT / Tax: +{currency}{taxAmount.toFixed(2)}</div>
+              {Number(taxAmount) > 0 && (
+                <div>VAT / Tax: +{currency}{Number(taxAmount).toFixed(2)}</div>
               )}
-              {roundingAdjustment !== 0 && (
-                <div className="text-indigo-600 font-bold">Rounding (Ceil): {roundingAdjustment > 0 ? '+' : ''}{currency}{roundingAdjustment.toFixed(2)}</div>
+              {Number(roundingAdjustment) !== 0 && (
+                <div className="text-indigo-600 font-bold">Rounding: {Number(roundingAdjustment) > 0 ? '+' : ''}{currency}{Number(roundingAdjustment).toFixed(2)}</div>
               )}
             </div>
           </div>
 
           {/* Payment Method Selector */}
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-2">
-              Select Payment Method
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                Select Payment Head / Method
+              </label>
+              <span className="text-[10px] font-mono text-indigo-600 font-bold">
+                {paymentMethod === 'cash' && 'DR: [1010] Cash in Hand'}
+                {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
+                  selectedBankObj ? `DR: [${selectedBankObj.chart_of_account?.account_code || '1020'}] ${selectedBankObj.bank_name}` : 'DR: [1020] Bank Accounts'
+                )}
+                {paymentMethod === 'credit' && 'DR: [1050] Accounts Receivable'}
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {paymentMethods.map((m) => {
                 const Icon = m.icon;
@@ -190,14 +245,14 @@ export default function PosPaymentModal({
                       const prevMethod = paymentMethod;
                       setPaymentMethod(m.id);
                       if (m.id === 'credit') {
-                        // For credit sale, default down payment is 0.00 unless custom
-                        if (numericPaid === grandTotal || prevMethod !== 'credit') {
+                        if (numericPaid === currentNumericTotal || prevMethod !== 'credit') {
                           setPaidAmount('0.00');
                         }
+                      } else if (m.id === 'card' || m.id === 'bank_transfer') {
+                        setPaidAmount(currentNumericTotal.toFixed(2));
                       } else {
-                        // For cash/card/bank, if it was 0 from credit, reset to exact grandTotal
                         if (numericPaid === 0 || prevMethod === 'credit') {
-                          setPaidAmount(grandTotal.toFixed(2));
+                          setPaidAmount(currentNumericTotal.toFixed(2));
                         }
                       }
                     }}
@@ -225,13 +280,50 @@ export default function PosPaymentModal({
             </div>
           </div>
 
-          {/* Payment Tender / Down-Payment Input Box */}
+          {/* Specific Bank Account Selector (Shown when Card / Bank Transfer is selected) */}
+          {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
+            <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                  <Landmark className="w-4 h-4 text-indigo-600" />
+                  <span>Choose Destination Bank Account</span>
+                </label>
+                <span className="text-[10px] text-indigo-700 font-bold">
+                  {internalBankAccounts.length} Registered Banks
+                </span>
+              </div>
+
+              {internalBankAccounts.length === 0 ? (
+                <div className="text-xs text-slate-500 bg-white p-2.5 rounded-xl border border-indigo-100">
+                  No specific bank accounts registered. Master head [1020] Bank Accounts will be debited.
+                </div>
+              ) : (
+                <select
+                  value={selectedBankId}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                >
+                  {internalBankAccounts.map((bank) => (
+                    <option key={bank.id} value={bank.id}>
+                      {bank.bank_name} - {bank.account_name} (A/C: {bank.account_number})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Payment Tender / Amount Input Box */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <label className="text-xs font-bold text-slate-700">
-                {paymentMethod === 'credit' ? 'Down Payment / Paid Now (৳)' : `Amount Received / Tendered (${currency})`}
+                {paymentMethod === 'credit'
+                  ? 'Down Payment / Paid Now (৳)'
+                  : isExactOnly
+                  ? `Amount Charged (${currency})`
+                  : `Amount Received / Tendered (${currency})`}
               </label>
-              {paymentMethod === 'credit' ? (
+              {paymentMethod === 'credit' && (
                 <button
                   type="button"
                   onClick={() => setPaidAmount('0.00')}
@@ -239,13 +331,14 @@ export default function PosPaymentModal({
                 >
                   Full Credit (৳0.00 Paid)
                 </button>
-              ) : (
+              )}
+              {paymentMethod === 'cash' && (
                 <button
                   type="button"
                   onClick={handleSetExact}
                   className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 hover:underline"
                 >
-                  Exact Amount ({currency}{grandTotal.toFixed(2)})
+                  Exact Amount ({currency}{currentNumericTotal.toFixed(2)})
                 </button>
               )}
             </div>
@@ -259,11 +352,16 @@ export default function PosPaymentModal({
                 type="number"
                 step="0.01"
                 min="0"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
+                value={isExactOnly ? currentNumericTotal.toFixed(2) : paidAmount}
+                onChange={(e) => {
+                  if (!isExactOnly) setPaidAmount(e.target.value);
+                }}
+                readOnly={isExactOnly}
                 placeholder="0.00"
                 className={`w-full pl-10 pr-4 py-3 rounded-2xl border-2 text-xl font-black text-slate-900 outline-none transition-all ${
-                  paymentMethod === 'credit'
+                  isExactOnly
+                    ? 'bg-slate-50 border-slate-200 cursor-not-allowed text-slate-800'
+                    : paymentMethod === 'credit'
                     ? 'border-amber-300 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10'
                     : isWalkIn && balanceDue > 0
                     ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
@@ -273,8 +371,8 @@ export default function PosPaymentModal({
               />
             </div>
 
-            {/* Quick Presets */}
-            {paymentMethod === 'credit' ? (
+            {/* Quick Presets (Only for Cash and Credit) */}
+            {paymentMethod === 'credit' && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 <button
                   type="button"
@@ -285,27 +383,29 @@ export default function PosPaymentModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaidAmount((grandTotal * 0.25).toFixed(2))}
+                  onClick={() => setPaidAmount((currentNumericTotal * 0.25).toFixed(2))}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
                 >
-                  25% Down ({currency}{(grandTotal * 0.25).toFixed(0)})
+                  25% Down ({currency}{(currentNumericTotal * 0.25).toFixed(0)})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaidAmount((grandTotal * 0.50).toFixed(2))}
+                  onClick={() => setPaidAmount((currentNumericTotal * 0.50).toFixed(2))}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
                 >
-                  50% Down ({currency}{(grandTotal * 0.50).toFixed(0)})
+                  50% Down ({currency}{(currentNumericTotal * 0.50).toFixed(0)})
                 </button>
                 <button
                   type="button"
                   onClick={handleSetExact}
                   className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
                 >
-                  Full Paid ({currency}{grandTotal.toFixed(2)})
+                  Full Paid ({currency}{currentNumericTotal.toFixed(2)})
                 </button>
               </div>
-            ) : (
+            )}
+
+            {paymentMethod === 'cash' && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 <button
                   type="button"
@@ -342,20 +442,6 @@ export default function PosPaymentModal({
                 >
                   +{currency}1,000
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPaidAmount('500')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-                >
-                  {currency}500
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaidAmount('1000')}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-                >
-                  {currency}1000
-                </button>
               </div>
             )}
           </div>
@@ -373,8 +459,8 @@ export default function PosPaymentModal({
                   </div>
                   <p className="text-[10px] text-amber-700 mt-0.5 font-medium">
                     {numericPaid > 0
-                      ? `Paid Now: ${currency}${numericPaid.toFixed(2)} • Due added to customer: ${currency}${balanceDue.toFixed(2)}`
-                      : `Total ${currency}${grandTotal.toFixed(2)} will be added to customer receivables ledger.`}
+                      ? `Paid: ${currency}${numericPaid.toFixed(2)} • Due to AR: ${currency}${balanceDue.toFixed(2)}`
+                      : `Total ${currency}${currentNumericTotal.toFixed(2)} recorded in Accounts Receivable [1050].`}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black">
@@ -410,7 +496,7 @@ export default function PosPaymentModal({
                   </div>
                   {isWalkIn && (
                     <span className="text-[10px] font-bold text-rose-700 block mt-0.5">
-                      Walk-in customer must tender at least {currency}{grandTotal.toFixed(2)}
+                      Walk-in customer must tender at least {currency}{currentNumericTotal.toFixed(2)}
                     </span>
                   )}
                 </div>
@@ -438,13 +524,13 @@ export default function PosPaymentModal({
           {/* Optional Note */}
           <div>
             <label className="text-[11px] font-bold text-slate-600 block mb-1">
-              Payment Note / Reference (Optional)
+              Payment Note / Bank Slip / Trx ID (Optional)
             </label>
             <input
               type="text"
               value={paymentNote}
               onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="e.g., Cash counter tender, TRX ID, etc."
+              placeholder="e.g., POS Counter receipt, Check #, Trx ID, etc."
               className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-600"
             />
           </div>
@@ -474,23 +560,23 @@ export default function PosPaymentModal({
               {submitting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Processing Checkout...</span>
+                  <span>Processing Payment...</span>
                 </>
               ) : isWalkIn && balanceDue > 0 ? (
-                <span>Full Payment Required ({currency}{grandTotal.toFixed(2)})</span>
+                <span>Full Payment Required ({currency}{currentNumericTotal.toFixed(2)})</span>
               ) : paymentMethod === 'credit' ? (
                 <>
                   <Clock className="w-4 h-4" />
                   <span>
                     {balanceDue > 0
                       ? `Confirm Credit Sale (${currency}${balanceDue.toFixed(2)} Due)`
-                      : 'Confirm Sale & Print Receipt'}
+                      : 'Confirm Sale & Complete'}
                   </span>
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Confirm Payment & Print Receipt</span>
+                  <span>Confirm Payment & Complete</span>
                 </>
               )}
             </button>

@@ -117,8 +117,9 @@ class OrderController extends Controller
 
         $paidAmount = $request->filled('paid_amount') ? (float) $request->paid_amount : null;
         $paymentMethod = $request->get('payment_method');
+        $bankAccountId = $request->filled('bank_account_id') ? (int) $request->bank_account_id : null;
 
-        $result = $this->orderService->completeOrder($order, $paidAmount, $paymentMethod);
+        $result = $this->orderService->completeOrder($order, $paidAmount, $paymentMethod, $bankAccountId);
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }

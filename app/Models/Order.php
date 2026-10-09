@@ -22,6 +22,8 @@ class Order extends Model
         'status',
         'payment_status',
         'payment_method',
+        'bank_account_id',
+        'chart_of_account_id',
         'subtotal',
         'discount_rate',
         'discount_amount',
@@ -70,6 +72,16 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class, 'bank_account_id');
+    }
+
+    public function chartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id');
     }
 
     public function taxRate(): BelongsTo

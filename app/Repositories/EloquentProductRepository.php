@@ -122,6 +122,7 @@ class EloquentProductRepository implements ProductRepositoryInterface
 
             foreach ($variantsData as $variantData) {
                 $variantData['product_id'] = $product->id;
+                $variantData['stock_quantity'] = 0;
                 $variantData['alert_quantity'] = $variantData['alert_quantity'] ?? 5;
                 $variantData['is_active'] = $variantData['is_active'] ?? true;
                 ProductVariant::create($variantData);
@@ -170,7 +171,7 @@ class EloquentProductRepository implements ProductRepositoryInterface
                         'barcode' => $variantData['barcode'] ?? null,
                         'cost_price' => $variantData['cost_price'],
                         'selling_price' => $variantData['selling_price'],
-                        'stock_quantity' => $variantData['stock_quantity'] ?? 0,
+                        'stock_quantity' => 0,
                         'alert_quantity' => $variantData['alert_quantity'] ?? 5,
                         'is_active' => true,
                     ]);

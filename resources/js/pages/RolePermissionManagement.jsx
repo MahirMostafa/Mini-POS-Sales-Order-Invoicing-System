@@ -16,8 +16,10 @@ import {
   Shield,
   X
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function RolePermissionManagement() {
+  const { refreshUser } = useAuth();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
@@ -134,7 +136,10 @@ export default function RolePermissionManagement() {
         timer: 1500,
         showConfirmButton: false
       });
-      fetchRolesAndPermissions();
+      await fetchRolesAndPermissions();
+      if (refreshUser) {
+        await refreshUser();
+      }
     } catch (err) {
       Swal.fire({
         icon: 'error',
@@ -167,9 +172,49 @@ export default function RolePermissionManagement() {
     'manage-purchases': { title: 'Manage Supplier Purchases', desc: 'Can create and inspect supplier purchase orders and procurement logs' },
     'receive-purchases': { title: 'Receive & Stock Purchases', desc: 'Can confirm physical arrival of goods, update stock inventory and sign Goods Received Notes (GRN)' },
     'manage-tax-rates': { title: 'Manage VAT & Tax Rates', desc: 'Can create and configure dynamic tax rates and default tax rule' },
-    'view-accounting-dashboard': { title: 'View Accounting Dashboard', desc: 'Can inspect Revenue, COGS, Gross Margin & Profit summaries' },
-    'view-ledger': { title: 'View General Ledger', desc: 'Can inspect individual Account statement ledgers and running balances' },
+    
+    // Granular Dashboard Section Permissions
+    'view-accounting-dashboard': { title: 'View Accounting Dashboard', desc: 'Can open the Accounting & Financials module' },
+    'view-dashboard-financials': { title: 'Dashboard: Financial Summary Cards', desc: 'Can view Total Sales Revenue, Net Profit, VAT Collected, and Receivables KPIs' },
+    'view-dashboard-stock-info': { title: 'Dashboard: Stock Valuation & Pricing', desc: 'Can view Total Stock Cost Value, Expected Sales Value, and Potential Margin on Dashboard' },
+    'view-dashboard-customer-info': { title: 'Dashboard: Customer Receivables / Dues', desc: 'Can view Customer Credit / Due balance cards and customer summary on Dashboard' },
+    'view-dashboard-orders-info': { title: 'Dashboard: Sales & Order Analytics', desc: 'Can view Completed Orders, AOV, and Sales Volume metrics on Dashboard' },
+    'view-dashboard-recent-journals': { title: 'Dashboard: Recent Journal Stream', desc: 'Can view real-time feed of latest double-entry journal vouchers on Dashboard' },
+
+    // Cash in Hand Permissions
+    'view-cash-book': { title: 'View Cash in Hand / Book', desc: 'Can inspect Cash in Hand debit/credit receipts, payments and closing cash balances' },
+    'add-cash-money': { title: 'Add Money to Cash (Inflow)', desc: 'Can inject capital, bank cash-withdrawals, or income directly into Cash in Hand' },
+    'withdraw-cash-money': { title: 'Withdraw Cash (Outflow)', desc: 'Can record cash payout vouchers, petty expenses, owner drawings, or bank deposits' },
+    'manage-cash-book': { title: 'Manage All Cash Book Operations', desc: 'Super permission covering all Cash in Hand drawer and cash book operations' },
+
+    // Bank Accounts Permissions
+    'view-banks': { title: 'View Bank Accounts List', desc: 'Can view corporate bank accounts list, balances, and status summaries' },
+    'create-banks': { title: 'Create / Register Bank Account', desc: 'Can register new corporate bank accounts, branch details, routing, and opening balances' },
+    'edit-banks': { title: 'Edit Bank Account Details', desc: 'Can modify bank account numbers, branch names, routing codes, and active status' },
+    'delete-banks': { title: 'Delete / Deactivate Bank Account', desc: 'Can remove or safely deactivate bank accounts' },
+    'deposit-banks': { title: 'Deposit / Add Money to Bank', desc: 'Can deposit cash, inter-bank transfers, capital or income into bank accounts' },
+    'withdraw-banks': { title: 'Withdraw / Transfer from Bank', desc: 'Can record bank withdrawals, inter-bank transfers, vendor payouts, and expenses' },
+    'view-bank-statements': { title: 'View Bank Statements & Ledger', desc: 'Can view detailed chronological debit/credit statements and transaction history for banks' },
+    'manage-banks': { title: 'Manage All Bank Operations', desc: 'Super permission covering all banking operations and accounts' },
+
+    // Financial Statements & Books
+    'view-bank-book': { title: 'View Bank Book', desc: 'Can inspect individual bank account statements, deposits, withdrawals and bank balances' },
+    'view-day-book': { title: 'View Day Book', desc: 'Can inspect daily chronological journal vouchers and day-wise financial movements' },
+    'view-trial-balance': { title: 'View Trial Balance', desc: 'Can inspect debit/credit equilibrium verification across all accounts' },
+    'view-balance-sheet': { title: 'View Balance Sheet', desc: 'Can inspect Assets, Liabilities, and Equity financial position (Assets = Liabilities + Equity)' },
+    'view-profit-loss': { title: 'View Profit & Loss Statement', desc: 'Can inspect Revenue vs COGS vs Operating Expenses and Net Income' },
+    'view-ledger': { title: 'View General Ledger', desc: 'Can inspect individual account statement ledgers and running balances' },
     'view-journal-entries': { title: 'View Journal Entries', desc: 'Can view double-entry debit and credit accounting transaction logs' },
+    'create-journal-entry': { title: 'Create Manual Vouchers', desc: 'Can post custom manual journal vouchers, contra transfers, and expense entries' },
+
+    // Chart of Accounts (COA)
+    'view-chart-of-accounts': { title: 'View Chart of Accounts', desc: 'Can inspect Chart of Accounts catalog and accounting head structures' },
+    'create-chart-of-accounts': { title: 'Create Accounting Head', desc: 'Can create new accounting heads (Asset, Liability, Equity, Revenue, Expense)' },
+    'edit-chart-of-accounts': { title: 'Edit Accounting Head', desc: 'Can update accounting head codes, names, and normal balance conventions' },
+    'delete-chart-of-accounts': { title: 'Delete Accounting Head', desc: 'Can remove or deactivate unused accounting heads' },
+    'manage-chart-of-accounts': { title: 'Manage All Chart of Accounts (COA)', desc: 'Super permission covering all Chart of Accounts operations' },
+
+    // System Administration
     'manage-users': { title: 'Manage System Users', desc: 'Can create staff accounts, assign passwords and assign roles' },
     'manage-roles': { title: 'Manage Roles & Permissions', desc: 'Can configure Spatie permission matrices for roles' },
     'view-audit-logs': { title: 'View Audit Activity Logs', desc: 'Can inspect background queue audit logs and critical changes' },
@@ -178,6 +223,25 @@ export default function RolePermissionManagement() {
 
   // Group permissions logically
   const getPermissionGroup = (name) => {
+    if (name.startsWith('view-dashboard-')) {
+      return 'Dashboard Section Permissions';
+    }
+    if (name.includes('cash-book') || name.includes('cash-money')) {
+      return 'Cash in Hand & Drawer Flow';
+    }
+    if (name.includes('bank') || name.includes('banks')) {
+      if (name === 'view-bank-book') return 'Financial Statements & Books';
+      return 'Bank Accounts & Banking';
+    }
+    if (name.includes('chart-of-accounts')) {
+      return 'Chart of Accounts (COA)';
+    }
+    if (name.includes('day-book') || name.includes('trial-balance') || name.includes('balance-sheet') || name.includes('profit-loss') || name.includes('ledger') || name.includes('journal')) {
+      return 'Financial Statements & Books';
+    }
+    if (name.includes('tax')) {
+      return 'Accounting Configuration & Taxes';
+    }
     if (name.includes('customer')) {
       return 'Customer Management & CRM';
     }
@@ -186,9 +250,6 @@ export default function RolePermissionManagement() {
     }
     if (name.includes('product') || name.includes('category') || name.includes('purchase')) {
       return 'Inventory, Categories & Purchasing';
-    }
-    if (name.includes('accounting') || name.includes('ledger') || name.includes('journal') || name.includes('tax')) {
-      return 'Double-Entry Accounting & Taxes';
     }
     return 'Administration & Security';
   };

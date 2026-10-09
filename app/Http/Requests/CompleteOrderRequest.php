@@ -15,7 +15,9 @@ class CompleteOrderRequest extends FormRequest
     {
         return [
             'paid_amount' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,bank_transfer,card,credit',
+            'payment_method' => 'nullable|in:cash,bank_transfer,card,digital,credit',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
+            'chart_of_account_id' => 'nullable|exists:chart_of_accounts,id',
         ];
     }
 }

@@ -20,6 +20,19 @@ if (csrfToken) {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Session expired or CSRF token mismatch
+    if (error.response?.status === 419) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Session Expired',
+        text: 'Your session has expired. The page will reload to refresh your authentication.',
+        confirmButtonColor: '#6366f1',
+      }).then(() => {
+        window.location.reload();
+      });
+      return Promise.reject(error);
+    }
+
     const message = error.response?.data?.message || error.message || 'An unexpected error occurred.';
     
     // Don't auto-popup on 404 or auth checks

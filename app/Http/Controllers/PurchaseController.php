@@ -46,6 +46,8 @@ class PurchaseController extends Controller
             'purchase_date' => 'required|date',
             'status' => 'nullable|string|in:pending,received',
             'payment_method' => 'required|string|in:cash,bank_transfer,card,credit',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
+            'chart_of_account_id' => 'nullable|exists:chart_of_accounts,id',
             'paid_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',

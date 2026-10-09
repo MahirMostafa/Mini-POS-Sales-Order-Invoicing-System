@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\CustomerRepositoryInterface;
+use App\Contracts\Services\AccountingServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,8 @@ use Illuminate\Http\Request;
 class CustomerController extends Controller
 {
     public function __construct(
-        protected CustomerRepositoryInterface $customerRepo
+        protected CustomerRepositoryInterface $customerRepo,
+        protected AccountingServiceInterface $accountingService
     ) {
     }
 
@@ -153,12 +155,25 @@ class CustomerController extends Controller
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'nullable|string|in:cash,card,bank_transfer',
+            'payment_method' => 'nullable|string|in:cash,card,bank_transfer,digital',
+            'bank_account_id' => 'nullable|exists:bank_accounts,id',
             'note' => 'nullable|string|max:255',
         ]);
 
         $settleAmount = (float) $validated['amount'];
+        $method = $validated['payment_method'] ?? 'cash';
+        $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+
         $newBalance = $this->customerRepo->settleDue($customer, $settleAmount);
+
+        // Record balanced double-entry journal entry in general ledger
+        $this->accountingService->recordCustomerDueSettlementJournalEntry(
+            $customer,
+            $settleAmount,
+            $method,
+            $bankAccountId,
+            $validated['note'] ?? null
+        );
 
         return response()->json([
             'success' => true,

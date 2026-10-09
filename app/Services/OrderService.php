@@ -130,6 +130,8 @@ class OrderService implements OrderServiceInterface
                 'status' => 'pending', // Stock is NOT deducted in pending state
                 'payment_status' => $paymentStatus,
                 'payment_method' => $paymentMethod,
+                'bank_account_id' => $data['bank_account_id'] ?? null,
+                'chart_of_account_id' => $data['chart_of_account_id'] ?? null,
                 'subtotal' => $subtotal,
                 'discount_rate' => $discountRate,
                 'discount_amount' => $orderDiscount,
@@ -157,7 +159,7 @@ class OrderService implements OrderServiceInterface
 
             // 6. If user requested instant checkout (action = complete)
             if (!empty($data['auto_complete'])) {
-                $completeResult = $this->completeOrder($order, $paidAmount, $orderData['payment_method']);
+                $completeResult = $this->completeOrder($order, $paidAmount, $orderData['payment_method'], $orderData['bank_account_id']);
                 if (!$completeResult['success']) {
                     throw new RuntimeException($completeResult['message']);
                 }
@@ -199,7 +201,7 @@ class OrderService implements OrderServiceInterface
         ];
     }
 
-    public function completeOrder(Order $order, ?float $paidAmount = null, ?string $paymentMethod = null): array
+    public function completeOrder(Order $order, ?float $paidAmount = null, ?string $paymentMethod = null, ?int $bankAccountId = null): array
     {
         if ($order->status === 'completed') {
             return [
@@ -262,6 +264,9 @@ class OrderService implements OrderServiceInterface
             }
             if ($paymentMethod) {
                 $order->payment_method = $paymentMethod;
+            }
+            if ($bankAccountId) {
+                $order->bank_account_id = $bankAccountId;
             }
 
             $this->orderRepo->updateStatus($order, 'completed', $paymentStatus);

@@ -136,11 +136,17 @@ class PosOrderAccountingWorkflowTest extends TestCase
         $this->assertTrue($journalEntry->isBalanced());
 
         // Check specific debit/credit accounts
-        $arItem = $journalEntry->items->where('account.account_code', '1050')->first();
-        $salesItem = $journalEntry->items->where('account.account_code', '4010')->first();
-        $taxItem = $journalEntry->items->where('account.account_code', '2010')->first();
+        $paymentItem = $journalEntry->items->first(function ($item) {
+            return in_array($item->account?->account_code, ['1010', '1050']);
+        });
+        $salesItem = $journalEntry->items->first(function ($item) {
+            return $item->account?->account_code === '4010';
+        });
+        $taxItem = $journalEntry->items->first(function ($item) {
+            return $item->account?->account_code === '2010';
+        });
 
-        $this->assertNotNull($arItem);
+        $this->assertNotNull($paymentItem);
         $this->assertNotNull($salesItem);
         $this->assertNotNull($taxItem);
         $this->assertEquals(14.50, (float) $taxItem->credit); // 5% of 290 = 14.50

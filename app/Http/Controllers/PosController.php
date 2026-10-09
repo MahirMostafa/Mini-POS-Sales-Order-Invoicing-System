@@ -33,12 +33,14 @@ class PosController extends Controller
         $defaultTaxRate = $this->taxRateRepo->getDefault();
         $currency = $this->settingRepo->getCurrencySymbol();
         $company = $this->settingRepo->getCompanyInfo();
+        $bankAccounts = \App\Models\BankAccount::where('is_active', true)->with('chartOfAccount')->get();
 
         return response()->json([
             'success' => true,
             'products' => $products,
             'categories' => $categories,
             'customers' => $customers,
+            'bank_accounts' => $bankAccounts,
             'tax_rates' => $taxRates,
             'default_tax_rate' => $defaultTaxRate,
             'currency' => $currency,

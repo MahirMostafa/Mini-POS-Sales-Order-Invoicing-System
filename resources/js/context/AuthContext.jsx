@@ -103,13 +103,21 @@ export const AuthProvider = ({ children }) => {
   const canAccessRoute = (allowedRoles = [], requiredPermissions = []) => {
     if (!user) return false;
     if (role === 'Admin') return true;
-    if (allowedRoles.length > 0 && allowedRoles.includes(role)) {
-      return true;
+
+    // If specific permissions are required, user MUST have at least one of them
+    if (requiredPermissions.length > 0) {
+      const hasRequiredPerm = requiredPermissions.some((p) => permissions.includes(p));
+      if (!hasRequiredPerm) {
+        return false;
+      }
     }
-    if (requiredPermissions.length > 0 && requiredPermissions.some((p) => permissions.includes(p))) {
-      return true;
+
+    // If role restriction is specified, user must also match an allowed role
+    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+      return false;
     }
-    return false;
+
+    return true;
   };
 
   return (

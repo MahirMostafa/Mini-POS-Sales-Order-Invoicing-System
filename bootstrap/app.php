@@ -11,6 +11,24 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'auth/*',
+            'pos/*',
+            'orders/*',
+            'invoices/*',
+            'accounting/*',
+            'bank-accounts/*',
+            'users/*',
+            'roles/*',
+            'customers/*',
+            'categories/*',
+            'products/*',
+            'purchases/*',
+            'taxes/*',
+            'audit/*',
+            'settings/*',
+        ]);
+
         $middleware->web(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,

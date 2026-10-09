@@ -21,6 +21,8 @@ class Purchase extends Model
         'total_amount',
         'paid_amount',
         'payment_method',
+        'bank_account_id',
+        'chart_of_account_id',
         'notes',
         'user_id',
         'received_by_user_id',
@@ -50,5 +52,15 @@ class Purchase extends Model
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by_user_id');
+    }
+
+    public function bankAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankAccount::class, 'bank_account_id');
+    }
+
+    public function chartOfAccount(): BelongsTo
+    {
+        return $this->belongsTo(ChartOfAccount::class, 'chart_of_account_id');
     }
 }

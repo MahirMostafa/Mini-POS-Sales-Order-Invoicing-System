@@ -35,6 +35,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
   const [customers, setCustomers] = useState([]);
   const [taxRates, setTaxRates] = useState([]);
   const [selectedTaxRate, setSelectedTaxRate] = useState(null);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [currency, setCurrency] = useState('৳');
   const [loading, setLoading] = useState(true);
 
@@ -70,6 +71,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         setProducts(res.data.products || []);
         setCategories(res.data.categories || []);
         setCustomers(res.data.customers || []);
+        setBankAccounts(res.data.bank_accounts || []);
         setTaxRates(res.data.tax_rates || []);
         setCurrency(res.data.currency || '৳');
         setCompany(res.data.company || {});
@@ -327,6 +329,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         notes: orderNotes,
         order_date: orderDate,
         payment_method: paymentData.payment_method || 'cash',
+        bank_account_id: paymentData.bank_account_id || null,
         items: cartItems.map((item) => ({
           product_id: item.product_id,
           product_variant_id: item.product_variant_id,
@@ -344,6 +347,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
       const completeRes = await api.post(`/orders/${createdOrder.id}/complete`, {
         paid_amount: paymentData.paid_amount,
         payment_method: paymentData.payment_method,
+        bank_account_id: paymentData.bank_account_id || null,
         payment_note: paymentData.payment_note || 'POS Counter Payment',
       });
 
@@ -844,6 +848,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         customer={selectedCustomer}
         itemCount={cartItems.reduce((s, i) => s + i.quantity, 0)}
         currency={currency}
+        bankAccounts={bankAccounts}
         onClose={() => setIsPaymentModalOpen(false)}
         onConfirmPayment={handleConfirmPaymentAndComplete}
         submitting={submitting}

@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\CategoryRepositoryInterface;
 use App\Contracts\Repositories\ProductRepositoryInterface;
+use App\Contracts\Services\AccountingServiceInterface;
+use App\Contracts\Services\InventoryServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Models\ProductVariant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,7 +15,9 @@ class ProductController extends Controller
 {
     public function __construct(
         protected ProductRepositoryInterface $productRepo,
-        protected CategoryRepositoryInterface $categoryRepo
+        protected CategoryRepositoryInterface $categoryRepo,
+        protected InventoryServiceInterface $inventoryService,
+        protected AccountingServiceInterface $accountingService
     ) {
     }
 
@@ -60,15 +65,21 @@ class ProductController extends Controller
             'variants.*.barcode' => 'nullable|string|unique:product_variants,barcode',
             'variants.*.cost_price' => 'required|numeric|min:0',
             'variants.*.selling_price' => 'required|numeric|min:0',
-            'variants.*.stock_quantity' => 'required|integer|min:0',
+            'variants.*.stock_quantity' => 'nullable|integer|min:0',
             'variants.*.alert_quantity' => 'nullable|integer|min:0',
         ]);
+
+        // Force initial stock to 0 for all variants to enforce accounting compliance
+        foreach ($validated['variants'] as &$variant) {
+            $variant['stock_quantity'] = 0;
+        }
+        unset($variant);
 
         $product = $this->productRepo->createWithVariants($validated, $validated['variants']);
 
         return response()->json([
             'success' => true,
-            'message' => 'Product and variants created successfully.',
+            'message' => 'Product and variants created successfully with 0 initial stock. Inventory can be added via Purchase Order or Opening Stock voucher.',
             'product' => $product,
         ], 201);
     }
@@ -93,7 +104,7 @@ class ProductController extends Controller
             'variants.*.barcode' => 'nullable|string',
             'variants.*.cost_price' => 'required|numeric|min:0',
             'variants.*.selling_price' => 'required|numeric|min:0',
-            'variants.*.stock_quantity' => 'required|integer|min:0',
+            'variants.*.stock_quantity' => 'nullable|integer|min:0',
             'variants.*.alert_quantity' => 'nullable|integer|min:0',
         ]);
 
@@ -128,6 +139,44 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Product '{$productName}' deleted successfully.",
+        ]);
+    }
+
+    public function addStock(Request $request, int $variantId): JsonResponse
+    {
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'purchase_cost' => 'required|numeric|min:0',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $variant = ProductVariant::with('product')->find($variantId);
+        if (!$variant) {
+            return response()->json(['success' => false, 'message' => 'Product variant not found.'], 404);
+        }
+
+        $userId = auth()->id() ?? 1;
+        $qty = (int) $validated['quantity'];
+        $cost = (float) $validated['purchase_cost'];
+        $note = $validated['note'] ?? 'Opening Stock initialization';
+
+        // 1. Update inventory stock and log movement
+        $this->inventoryService->addStock($variant, $qty, $cost, $userId, "Opening Stock: {$note}");
+
+        // 2. Post double-entry accounting journal voucher (Debit: 1060 Merchandise Inventory, Credit: 3010 Owner's Capital)
+        $journalEntry = $this->accountingService->recordOpeningStockJournalEntry(
+            $variant->fresh(),
+            $qty,
+            $cost,
+            $userId,
+            $note
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully recorded Opening Stock of {$qty} units (৳" . number_format($qty * $cost, 2) . ") with Journal Entry #{$journalEntry->entry_number}.",
+            'variant' => $variant->fresh(['product']),
+            'journal_entry' => $journalEntry,
         ]);
     }
 

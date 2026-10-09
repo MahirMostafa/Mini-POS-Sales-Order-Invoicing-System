@@ -61,8 +61,21 @@ export default function CustomerManagement() {
   const [settleCustomer, setSettleCustomer] = useState(null);
   const [settleAmount, setSettleAmount] = useState('');
   const [settleMethod, setSettleMethod] = useState('cash');
+  const [settleBankId, setSettleBankId] = useState('');
   const [settleNote, setSettleNote] = useState('');
   const [submittingSettle, setSubmittingSettle] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
+
+  const fetchBankAccounts = async () => {
+    try {
+      const res = await api.get('/bank-accounts?active_only=1');
+      if (res.data.success) {
+        setBankAccounts(res.data.bank_accounts || res.data.banks || []);
+      }
+    } catch (e) {
+      console.error('Failed to load bank accounts:', e);
+    }
+  };
 
   const fetchCustomers = async (page = 1) => {
     setLoading(true);
@@ -93,6 +106,7 @@ export default function CustomerManagement() {
 
   useEffect(() => {
     fetchCustomers(1);
+    fetchBankAccounts();
   }, []);
 
   const handleOpenAddModal = () => {
@@ -214,6 +228,7 @@ export default function CustomerManagement() {
     setSettleCustomer(cust);
     setSettleAmount(parseFloat(cust.credit_balance || 0).toFixed(2));
     setSettleMethod('cash');
+    setSettleBankId(bankAccounts.length > 0 ? bankAccounts[0].id : '');
     setSettleNote('');
   };
 
@@ -228,11 +243,17 @@ export default function CustomerManagement() {
 
     setSubmittingSettle(true);
     try {
-      const res = await api.post(`/customers/${settleCustomer.id}/settle-due`, {
+      const payload = {
         amount: numAmount,
         payment_method: settleMethod,
         note: settleNote,
-      });
+      };
+
+      if (settleMethod !== 'cash' && settleBankId) {
+        payload.bank_account_id = settleBankId;
+      }
+
+      const res = await api.post(`/customers/${settleCustomer.id}/settle-due`, payload);
 
       if (res.data.success) {
         Swal.fire({
@@ -837,19 +858,43 @@ export default function CustomerManagement() {
                 <select
                   value={settleMethod}
                   onChange={(e) => setSettleMethod(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 font-semibold"
                 >
-                  <option value="cash">Cash in Hand</option>
-                  <option value="card">Card / POS</option>
+                  <option value="cash">Cash in Hand (Head 1010)</option>
+                  <option value="card">Card / POS (Bank Account)</option>
                   <option value="bank_transfer">Bank / Digital Transfer</option>
                 </select>
               </div>
+
+              {settleMethod !== 'cash' && (
+                <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-1.5 animate-in fade-in duration-150">
+                  <label className="block text-xs font-bold text-indigo-900">
+                    Select Receiving Bank Account *
+                  </label>
+                  <select
+                    value={settleBankId}
+                    onChange={(e) => setSettleBankId(e.target.value)}
+                    required={settleMethod !== 'cash'}
+                    className="w-full px-3 py-2 rounded-lg border border-indigo-300 text-xs text-slate-900 bg-white font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.bank_name} - {b.account_name} ({b.account_number})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-[10px] text-indigo-700 flex items-center gap-1">
+                    <Building className="w-3 h-3 text-indigo-500" />
+                    <span>Double-entry debit will post directly to this selected Bank Head.</span>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Receipt Ref (Optional)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Cleared via Cash counter"
+                  placeholder="e.g. Cleared via Cash counter / Check #1234"
                   value={settleNote}
                   onChange={(e) => setSettleNote(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
