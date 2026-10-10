@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api/client';
 import Swal from 'sweetalert2';
 import { 
@@ -20,7 +21,8 @@ import {
   ArrowRight,
   RotateCcw,
   Check,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import VariantModal from '../components/VariantModal';
 import QuickCustomerModal from '../components/QuickCustomerModal';
@@ -38,6 +40,18 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
   const [bankAccounts, setBankAccounts] = useState([]);
   const [currency, setCurrency] = useState('৳');
   const [loading, setLoading] = useState(true);
+
+  // Pagination & Live Chunk Loading State
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    last_page: 1,
+    per_page: 100,
+    total: 0,
+    has_more: false,
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [barcodeScanning, setBarcodeScanning] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,14 +75,18 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
   const [submitting, setSubmitting] = useState(false);
 
   const barcodeInputRef = useRef(null);
+  const isInitialMount = useRef(true);
 
-  // Load POS Data
+  // Initial Load POS Configuration and first 100 Products
   const loadPosData = async () => {
     setLoading(true);
     try {
       const res = await api.get('/pos/init');
       if (res.data.success) {
         setProducts(res.data.products || []);
+        if (res.data.pagination) {
+          setPagination(res.data.pagination);
+        }
         setCategories(res.data.categories || []);
         setCustomers(res.data.customers || []);
         setBankAccounts(res.data.bank_accounts || []);
@@ -90,7 +108,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to initialize POS terminal:', err);
     } finally {
       setLoading(false);
     }
@@ -100,20 +118,67 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     loadPosData();
   }, []);
 
-  // Filtered Products Catalog
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesCategory = selectedCategory === 'all' || String(product.category_id) === String(selectedCategory);
-      const q = searchQuery.toLowerCase();
-      const matchesSearch = 
-        !searchQuery ||
-        product.name.toLowerCase().includes(q) ||
-        product.brand?.toLowerCase().includes(q) ||
-        product.variants?.some(v => v.variant_name.toLowerCase().includes(q) || v.sku.toLowerCase().includes(q) || (v.barcode && v.barcode.toLowerCase().includes(q)));
-      
-      return matchesCategory && matchesSearch;
-    });
-  }, [products, selectedCategory, searchQuery]);
+  // Fetch / Query Products from whole inventory with pagination
+  const fetchProducts = async (page = 1, append = false, categoryId = selectedCategory, q = searchQuery) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setSearching(true);
+    }
+
+    try {
+      const res = await api.get('/pos/products', {
+        params: {
+          page,
+          per_page: 100,
+          category_id: categoryId !== 'all' ? categoryId : undefined,
+          q: q.trim() || undefined,
+        },
+      });
+
+      if (res.data.success) {
+        if (append) {
+          setProducts((prev) => [...prev, ...(res.data.products || [])]);
+        } else {
+          setProducts(res.data.products || []);
+        }
+        if (res.data.pagination) {
+          setPagination(res.data.pagination);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching POS products:', err);
+    } finally {
+      setLoadingMore(false);
+      setSearching(false);
+    }
+  };
+
+  // Category switch handler
+  const handleCategorySelect = (catId) => {
+    setSelectedCategory(catId);
+    fetchProducts(1, false, catId, searchQuery);
+  };
+
+  // Debounced search across entire 5,000 product inventory
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchProducts(1, false, selectedCategory, searchQuery);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load More Products handler
+  const handleLoadMore = () => {
+    if (loadingMore || !pagination.has_more) return;
+    fetchProducts(pagination.current_page + 1, true, selectedCategory, searchQuery);
+  };
 
   // Product Selection handler
   const handleProductClick = (product) => {
@@ -190,38 +255,54 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     });
   };
 
-  // Barcode / SKU scanning handler
-  const handleBarcodeSubmit = (e) => {
+  // Global Barcode & SKU Scanning Handler across ENTIRE Database
+  const handleBarcodeSubmit = async (e) => {
     e.preventDefault();
-    if (!barcodeInput.trim()) return;
+    const term = barcodeInput.trim();
+    if (!term || barcodeScanning) return;
 
-    const term = barcodeInput.trim().toLowerCase();
-    let found = false;
+    setBarcodeScanning(true);
+    try {
+      const res = await api.get('/pos/search', {
+        params: { barcode: term },
+      });
 
-    for (const product of products) {
-      for (const variant of product.variants || []) {
-        if (
-          (variant.barcode && variant.barcode.toLowerCase() === term) ||
-          variant.sku.toLowerCase() === term
-        ) {
-          addItemToCart(variant, product);
-          found = true;
-          setBarcodeInput('');
-          break;
-        }
+      if (res.data.success && res.data.variant) {
+        const variant = res.data.variant;
+        const product = res.data.product || variant.product || {
+          id: variant.product_id,
+          name: variant.variant_name,
+        };
+
+        addItemToCart(variant, product);
+
+        // Toast feedback
+        Swal.fire({
+          icon: 'success',
+          title: 'Scanned & Added',
+          text: `Added ${product.name} (${variant.variant_name}) to cart.`,
+          timer: 1200,
+          showConfirmButton: false,
+          position: 'top-end',
+          toast: true,
+        });
+
+        setBarcodeInput('');
       }
-      if (found) break;
-    }
-
-    if (!found) {
+    } catch (err) {
       Swal.fire({
         icon: 'error',
         title: 'Item Not Found',
-        text: `No product variant found matching barcode/SKU: "${barcodeInput}"`,
-        timer: 1800,
+        text: err.response?.data?.message || `No product variant found matching barcode/SKU: "${term}" in entire inventory.`,
+        timer: 2000,
         showConfirmButton: false,
       });
       setBarcodeInput('');
+    } finally {
+      setBarcodeScanning(false);
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
     }
   };
 
@@ -310,7 +391,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     setIsPaymentModalOpen(true);
   };
 
-  // Step 2: Confirm Payment & Complete Sale (Takes money, posts double-entry journal, deducts stock, and opens 80mm receipt)
+  // Step 2: Confirm Payment & Complete Sale
   const handleConfirmPaymentAndComplete = async (paymentData) => {
     setSubmitting(true);
     try {
@@ -359,7 +440,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
 
       // Reset cart and reload live inventory
       handleResetCart();
-      loadPosData();
+      fetchProducts(1, false, selectedCategory, searchQuery);
 
       // Launch Instant 80mm POS Thermal Receipt Modal
       setReceiptData({
@@ -437,7 +518,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
         cancelButtonText: 'New Sale',
       }).then((result) => {
         handleResetCart();
-        loadPosData();
+        fetchProducts(1, false, selectedCategory, searchQuery);
         if (result.isConfirmed) {
           if (onNavigateToOrder) {
             onNavigateToOrder(createdOrder.id);
@@ -458,6 +539,10 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
     }
   };
 
+  const loadedCount = products.length;
+  const totalCount = pagination.total || loadedCount;
+  const progressPercent = totalCount > 0 ? Math.min(100, Math.round((loadedCount / totalCount) * 100)) : 100;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Top Banner & Barcode Scanning */}
@@ -469,11 +554,11 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
           </div>
           <h2 className="text-xl font-black text-slate-900">Point of Sale (POS) Terminal</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time pricing, multi-variant selection, dynamic VAT tax rates, and atomic double-entry accounting.
+            5,000 product inventory with instant barcode lookup, multi-variant pricing, and atomic accounting.
           </p>
         </div>
 
-        {/* Barcode scanner input */}
+        {/* Global Inventory Barcode scanner input */}
         <form onSubmit={handleBarcodeSubmit} className="flex items-center gap-2">
           <div className="relative">
             <Barcode className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -482,15 +567,17 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
               type="text"
               placeholder="Scan Barcode / SKU..."
               value={barcodeInput}
+              disabled={barcodeScanning}
               onChange={(e) => setBarcodeInput(e.target.value)}
-              className="pl-10 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 w-56 font-mono font-bold"
+              className="pl-10 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 w-56 font-mono font-bold disabled:opacity-60"
             />
           </div>
           <button
             type="submit"
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white shadow-xs transition-colors"
+            disabled={barcodeScanning || !barcodeInput.trim()}
+            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Scan
+            {barcodeScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Scan'}
           </button>
         </form>
       </div>
@@ -498,38 +585,43 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT COLUMN: Product Catalog (7 Cols) */}
         <div className="lg:col-span-7 space-y-4">
-          {/* Category Chips & Search Bar */}
+          {/* Category Chips & Global Search Bar */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search products by name, variant, or SKU..."
+                placeholder="Search across 5,000 products by name, brand, variant, or SKU..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                className="w-full pl-10 pr-10 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
               />
+              {searching && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                  <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+                </div>
+              )}
             </div>
 
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               <button
                 type="button"
-                onClick={() => setSelectedCategory('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                onClick={() => handleCategorySelect('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                   selectedCategory === 'all'
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                All Categories ({products.length})
+                All Categories ({pagination.total || products.length})
               </button>
               {categories.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  onClick={() => handleCategorySelect(cat.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                     String(selectedCategory) === String(cat.id)
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -541,74 +633,143 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
             </div>
           </div>
 
-          {/* Product Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto pr-1">
-            {filteredProducts.map((product) => {
-              const primaryVariant = product.variants?.[0];
-              const totalStock = product.variants?.reduce((sum, v) => sum + v.stock_quantity, 0) || 0;
-              const hasMultipleVariants = product.has_variants && product.variants?.length > 1;
+          {/* Product Grid with Framer Motion */}
+          {loading ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+              <div className="text-xs font-bold text-slate-600">Loading initial product catalog...</div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+              <Package className="w-10 h-10 text-slate-300 mx-auto mb-2 opacity-50" />
+              <div className="font-bold text-slate-700 text-sm">No products found</div>
+              <p className="text-xs text-slate-400 mt-1">Try refining your search term or select another category.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <motion.div 
+                layout
+                className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[560px] overflow-y-auto pr-1"
+              >
+                <AnimatePresence>
+                  {products.map((product) => {
+                    const primaryVariant = product.variants?.[0];
+                    const totalStock = product.variants?.reduce((sum, v) => sum + v.stock_quantity, 0) || 0;
+                    const hasMultipleVariants = product.has_variants && product.variants?.length > 1;
 
-              return (
-                <div
-                  key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className={`bg-white hover:border-indigo-400 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all shadow-xs hover:shadow-md group ${
-                    totalStock <= 0 ? 'opacity-60 bg-slate-50' : ''
-                  }`}
-                >
-                  <div>
-                    {/* Top badging */}
-                    <div className="flex items-center justify-between gap-1 mb-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 truncate max-w-[100px]">
-                        {product.category?.name || 'General'}
-                      </span>
-                      {hasMultipleVariants ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
-                          <Layers className="w-2.5 h-2.5" /> {product.variants.length} Variants
-                        </span>
-                      ) : (
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                            totalStock <= 0
-                              ? 'bg-rose-100 text-rose-700'
-                              : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
-                        </span>
-                      )}
-                    </div>
+                    return (
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        key={product.id}
+                        onClick={() => handleProductClick(product)}
+                        className={`bg-white hover:border-indigo-400 border border-slate-200 rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all shadow-xs hover:shadow-md group ${
+                          totalStock <= 0 ? 'opacity-60 bg-slate-50' : ''
+                        }`}
+                      >
+                        <div>
+                          {/* Top badging */}
+                          <div className="flex items-center justify-between gap-1 mb-2">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 truncate max-w-[100px]">
+                              {product.category?.name || 'General'}
+                            </span>
+                            {hasMultipleVariants ? (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                                <Layers className="w-2.5 h-2.5" /> {product.variants.length} Variants
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  totalStock <= 0
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                                }`}
+                              >
+                                {totalStock > 0 ? `${totalStock} in stock` : 'Out of stock'}
+                              </span>
+                            )}
+                          </div>
 
-                    <div className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                      {product.name}
-                    </div>
+                          <div className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                            {product.name}
+                          </div>
 
-                    {product.brand && (
-                      <div className="text-[11px] text-slate-400 font-medium">{product.brand}</div>
-                    )}
+                          {product.brand && (
+                            <div className="text-[11px] text-slate-400 font-medium">{product.brand}</div>
+                          )}
+                        </div>
+
+                        {/* Pricing & Click hint */}
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                          <div>
+                            {hasMultipleVariants ? (
+                              <span className="text-[10px] text-slate-400">From</span>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">Price</span>
+                            )}
+                            <div className="text-sm font-black text-slate-900">
+                              {currency}{primaryVariant ? Number(primaryVariant.selling_price).toFixed(0) : '0'}
+                            </div>
+                          </div>
+
+                          <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </motion.div>
+
+              {/* Load More Section & Progress Telemetry */}
+              <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex-1 w-full sm:w-auto">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
+                    <span>Showing {loadedCount} of {totalCount.toLocaleString()} products</span>
+                    <span className="text-indigo-600 font-mono">{progressPercent}%</span>
                   </div>
-
-                  {/* Pricing & Click hint */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-                    <div>
-                      {hasMultipleVariants ? (
-                        <span className="text-[10px] text-slate-400">From</span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400">Price</span>
-                      )}
-                      <div className="text-sm font-black text-slate-900">
-                        {currency}{primaryVariant ? Number(primaryVariant.selling_price).toFixed(0) : '0'}
-                      </div>
-                    </div>
-
-                    <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-500 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors">
-                      <Plus className="w-4 h-4" />
-                    </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-full rounded-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {pagination.has_more ? (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    disabled={loadingMore}
+                    onClick={handleLoadMore}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-600 hover:text-white text-indigo-700 font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Loading Next 100...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Load More Products (+100)</span>
+                      </>
+                    )}
+                  </motion.button>
+                ) : (
+                  <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-500 font-bold text-xs flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>All {totalCount.toLocaleString()} products loaded</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* RIGHT COLUMN: Sales Order Cart & Real-Time Invoicing Breakdown (5 Cols) */}
@@ -631,7 +792,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                   <button
                     type="button"
                     onClick={handleResetCart}
-                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" /> Clear Cart
                   </button>
@@ -674,7 +835,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.product_variant_id, -1)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100"
+                        className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -684,7 +845,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.product_variant_id, 1)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100"
+                        className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
                       </button>
@@ -698,7 +859,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                       <button
                         type="button"
                         onClick={() => removeItem(item.product_variant_id)}
-                        className="text-[10px] text-rose-500 hover:text-rose-700"
+                        className="text-[10px] text-rose-500 hover:text-rose-700 cursor-pointer"
                       >
                         Remove
                       </button>
@@ -793,7 +954,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                 type="button"
                 disabled={submitting || cartItems.length === 0}
                 onClick={handleSavePendingOrder}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs disabled:opacity-40 transition-all shadow-xs"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs disabled:opacity-40 transition-all shadow-xs cursor-pointer"
               >
                 <Clock className="w-3.5 h-3.5 text-amber-500" />
                 <span>Save Pending</span>
@@ -803,7 +964,7 @@ export default function PosTerminal({ onNavigateToInvoice, onNavigateToOrder }) 
                 type="button"
                 disabled={submitting || cartItems.length === 0}
                 onClick={handleInitiateCheckout}
-                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-40 transition-all"
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 disabled:opacity-40 transition-all cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Pay & Print ({currency}{grandTotal.toFixed(2)})</span>

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BankAccountController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PosController;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Route;
 // Authentication Endpoints
 Route::prefix('auth')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
+    Route::get('/captcha', [AuthController::class, 'generateCaptcha']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/quick-login/{user}', [AuthController::class, 'quickLogin']);
     Route::get('/demo-users', [AuthController::class, 'getDemoUsers']);
@@ -34,6 +36,7 @@ Route::prefix('auth')->group(function () {
 // POS Screen
 Route::prefix('pos')->group(function () {
     Route::get('/init', [PosController::class, 'init']);
+    Route::get('/products', [PosController::class, 'products']);
     Route::get('/search', [PosController::class, 'search']);
 });
 
@@ -53,9 +56,15 @@ Route::prefix('invoices')->group(function () {
     Route::get('/{id}', [InvoiceController::class, 'show']);
 });
 
+// Dashboard Analytics & Intelligence
+Route::prefix('dashboard')->group(function () {
+    Route::get('/stats', [DashboardController::class, 'stats']);
+    Route::get('/metrics', [DashboardController::class, 'stats']);
+});
+
 // Accounting Module & Financial Books
 Route::prefix('accounting')->group(function () {
-    Route::get('/dashboard', [AccountingController::class, 'dashboard']);
+    Route::get('/dashboard', [DashboardController::class, 'stats']);
     Route::get('/stock-metrics', [AccountingController::class, 'stockMetrics']);
     Route::get('/stock-valuation', [AccountingController::class, 'stockMetrics']);
     Route::get('/journal-entries', [AccountingController::class, 'journalEntries']);
