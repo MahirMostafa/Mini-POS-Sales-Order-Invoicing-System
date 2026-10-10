@@ -149,11 +149,17 @@ class OrderService implements OrderServiceInterface
 
             // 5. Asynchronous Queued Audit Log
             $this->auditService->log(
-                event: 'created',
+                event: 'order_created',
                 auditableType: Order::class,
                 auditableId: $order->id,
                 oldValues: null,
-                newValues: $order->toArray(),
+                newValues: [
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->customer?->name ?? 'Walk-in Customer',
+                    'total_amount' => (float) $order->grand_total,
+                    'status' => $order->status,
+                    'items_count' => count($orderItems),
+                ],
                 userId: $userId
             );
 
@@ -252,11 +258,12 @@ class OrderService implements OrderServiceInterface
             // 3. Update Order Status & Financials
             $paymentStatus = $order->payment_status;
             if ($paidAmount !== null) {
-                $order->paid_amount = $paidAmount;
-                $order->change_amount = $paidAmount > (float) $order->grand_total ? round($paidAmount - (float) $order->grand_total, 2) : 0.00;
-                if ($paidAmount >= (float) $order->grand_total && (float) $order->grand_total > 0) {
+                $cappedPaid = min((float) $order->grand_total, max(0, (float) $paidAmount));
+                $order->paid_amount = $cappedPaid;
+                $order->change_amount = (float) $paidAmount > (float) $order->grand_total ? round((float) $paidAmount - (float) $order->grand_total, 2) : 0.00;
+                if ($cappedPaid >= (float) $order->grand_total && (float) $order->grand_total > 0) {
                     $paymentStatus = 'paid';
-                } elseif ($paidAmount > 0) {
+                } elseif ($cappedPaid > 0) {
                     $paymentStatus = 'partially_paid';
                 } else {
                     $paymentStatus = 'unpaid';
@@ -291,6 +298,11 @@ class OrderService implements OrderServiceInterface
                 auditableId: $order->id,
                 oldValues: ['status' => 'pending'],
                 newValues: [
+                    'order_number' => $order->order_number,
+                    'customer_name' => $order->customer?->name ?? 'Walk-in Customer',
+                    'total_amount' => (float) $order->grand_total,
+                    'paid_amount' => (float) $order->paid_amount,
+                    'payment_method' => $order->payment_method,
                     'status' => 'completed',
                     'completed_at' => now()->toIso8601String(),
                     'invoice_id' => $invoice->id,
@@ -327,11 +339,15 @@ class OrderService implements OrderServiceInterface
         $this->orderRepo->updateStatus($order, 'cancelled');
 
         $this->auditService->log(
-            event: 'status_changed',
+            event: 'order_cancelled',
             auditableType: Order::class,
             auditableId: $order->id,
             oldValues: $old,
-            newValues: ['status' => 'cancelled', 'reason' => $reason],
+            newValues: [
+                'order_number' => $order->order_number,
+                'status' => 'cancelled',
+                'reason' => $reason,
+            ],
             userId: auth()->id() ?? $order->user_id
         );
 

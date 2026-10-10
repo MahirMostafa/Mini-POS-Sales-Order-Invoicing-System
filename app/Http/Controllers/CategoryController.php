@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\CategoryRepositoryInterface;
+use App\Contracts\Services\AuditServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,8 @@ use Illuminate\Http\Request;
 class CategoryController extends Controller
 {
     public function __construct(
-        protected CategoryRepositoryInterface $categoryRepo
+        protected CategoryRepositoryInterface $categoryRepo,
+        protected AuditServiceInterface $auditService
     ) {}
 
     /**
@@ -47,6 +49,20 @@ class CategoryController extends Controller
         ]);
 
         $category = $this->categoryRepo->create($validated);
+
+        // Audit Log: Category Created
+        $this->auditService->log(
+            event: 'category_created',
+            auditableType: 'App\Models\ProductCategory',
+            auditableId: $category->id,
+            oldValues: null,
+            newValues: [
+                'name' => $category->name,
+                'slug' => $category->slug,
+                'description' => $category->description,
+            ],
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,
@@ -96,7 +112,27 @@ class CategoryController extends Controller
             'is_active' => 'nullable|boolean',
         ]);
 
+        $oldData = [
+            'name' => $category->name,
+            'slug' => $category->slug,
+            'description' => $category->description,
+        ];
+
         $this->categoryRepo->update($category, $validated);
+
+        // Audit Log: Category Updated
+        $this->auditService->log(
+            event: 'category_updated',
+            auditableType: 'App\Models\ProductCategory',
+            auditableId: $category->id,
+            oldValues: $oldData,
+            newValues: [
+                'name' => $category->name,
+                'slug' => $category->slug,
+                'description' => $category->description,
+            ],
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,
@@ -154,7 +190,22 @@ class CategoryController extends Controller
         }
 
         $categoryName = $category->name;
+        $oldData = [
+            'name' => $category->name,
+            'slug' => $category->slug,
+        ];
+
         $this->categoryRepo->delete($category);
+
+        // Audit Log: Category Deleted
+        $this->auditService->log(
+            event: 'category_deleted',
+            auditableType: 'App\Models\ProductCategory',
+            auditableId: $id,
+            oldValues: $oldData,
+            newValues: null,
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,

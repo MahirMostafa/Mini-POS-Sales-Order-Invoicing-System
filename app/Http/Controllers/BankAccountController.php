@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\BankAccountRepositoryInterface;
 use App\Contracts\Repositories\AccountingRepositoryInterface;
+use App\Contracts\Services\AuditServiceInterface;
 use App\Models\BankAccount;
 use App\Models\ChartOfAccount;
 use App\Http\Controllers\Controller;
@@ -14,7 +15,8 @@ class BankAccountController extends Controller
 {
     public function __construct(
         protected BankAccountRepositoryInterface $bankRepo,
-        protected AccountingRepositoryInterface $accountingRepo
+        protected AccountingRepositoryInterface $accountingRepo,
+        protected AuditServiceInterface $auditService
     ) {
     }
 
@@ -82,6 +84,22 @@ class BankAccountController extends Controller
         ]);
 
         $bank = $this->bankRepo->create($validated);
+
+        // Audit Log: Bank Account Registered
+        $this->auditService->log(
+            event: 'bank_created',
+            auditableType: 'App\Models\BankAccount',
+            auditableId: $bank->id,
+            oldValues: null,
+            newValues: [
+                'bank_name' => $bank->bank_name,
+                'account_name' => $bank->account_name,
+                'account_number' => $bank->account_number,
+                'opening_balance' => (float) $bank->opening_balance,
+                'branch_name' => $bank->branch_name,
+            ],
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,
@@ -183,7 +201,23 @@ class BankAccountController extends Controller
             return response()->json(['success' => false, 'message' => 'Bank Account not found.'], 404);
         }
 
+        $oldData = [
+            'bank_name' => $bank->bank_name,
+            'account_name' => $bank->account_name,
+            'account_number' => $bank->account_number,
+        ];
+
         $this->bankRepo->delete($bank);
+
+        // Audit Log: Bank Account Deleted
+        $this->auditService->log(
+            event: 'bank_deleted',
+            auditableType: 'App\Models\BankAccount',
+            auditableId: $bank->id,
+            oldValues: $oldData,
+            newValues: null,
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,
@@ -268,6 +302,23 @@ class BankAccountController extends Controller
 
         $entry = $this->accountingRepo->createJournalEntry($entryData, $items);
 
+        // Audit Log: Bank Deposit
+        $this->auditService->log(
+            event: 'bank_deposit',
+            auditableType: 'App\Models\BankAccount',
+            auditableId: $bank->id,
+            oldValues: null,
+            newValues: [
+                'bank_name' => $bank->bank_name,
+                'account_number' => $bank->account_number,
+                'amount' => $amount,
+                'source_type' => $sourceType,
+                'note' => $note,
+                'voucher_number' => $entry->entry_number,
+            ],
+            userId: auth()->id() ?? 1
+        );
+
         return response()->json([
             'success' => true,
             'message' => "৳" . number_format($amount, 2) . " deposited into {$bank->bank_name} successfully. Voucher #{$entry->entry_number} recorded.",
@@ -345,6 +396,23 @@ class BankAccountController extends Controller
         ];
 
         $entry = $this->accountingRepo->createJournalEntry($entryData, $items);
+
+        // Audit Log: Bank Withdrawal
+        $this->auditService->log(
+            event: 'bank_withdraw',
+            auditableType: 'App\Models\BankAccount',
+            auditableId: $bank->id,
+            oldValues: null,
+            newValues: [
+                'bank_name' => $bank->bank_name,
+                'account_number' => $bank->account_number,
+                'amount' => $amount,
+                'destination_type' => $destType,
+                'note' => $note,
+                'voucher_number' => $entry->entry_number,
+            ],
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,

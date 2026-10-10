@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\CustomerRepositoryInterface;
 use App\Contracts\Services\AccountingServiceInterface;
+use App\Contracts\Services\AuditServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +13,8 @@ class CustomerController extends Controller
 {
     public function __construct(
         protected CustomerRepositoryInterface $customerRepo,
-        protected AccountingServiceInterface $accountingService
+        protected AccountingServiceInterface $accountingService,
+        protected AuditServiceInterface $auditService
     ) {
     }
 
@@ -98,6 +100,21 @@ class CustomerController extends Controller
 
         $customer = $this->customerRepo->create($validated);
 
+        // Audit Log: Customer Created
+        $this->auditService->log(
+            event: 'customer_created',
+            auditableType: 'App\Models\Customer',
+            auditableId: $customer->id,
+            oldValues: null,
+            newValues: [
+                'name' => $customer->name,
+                'customer_code' => $customer->customer_code,
+                'phone' => $customer->phone,
+                'email' => $customer->email,
+            ],
+            userId: auth()->id() ?? 1
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Customer '{$customer->name}' created successfully.",
@@ -130,7 +147,30 @@ class CustomerController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        $oldData = [
+            'name' => $customer->name,
+            'customer_code' => $customer->customer_code,
+            'phone' => $customer->phone,
+            'email' => $customer->email,
+            'address' => $customer->address,
+        ];
+
         $this->customerRepo->update($customer, $validated);
+
+        // Audit Log: Customer Updated
+        $this->auditService->log(
+            event: 'customer_updated',
+            auditableType: 'App\Models\Customer',
+            auditableId: $customer->id,
+            oldValues: $oldData,
+            newValues: [
+                'name' => $validated['name'],
+                'customer_code' => $validated['customer_code'] ?? $customer->customer_code,
+                'phone' => $validated['phone'] ?? $customer->phone,
+                'email' => $validated['email'] ?? $customer->email,
+            ],
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,
@@ -163,6 +203,7 @@ class CustomerController extends Controller
         $settleAmount = (float) $validated['amount'];
         $method = $validated['payment_method'] ?? 'cash';
         $bankAccountId = !empty($validated['bank_account_id']) ? (int) $validated['bank_account_id'] : null;
+        $oldBalance = (float) $customer->credit_balance;
 
         $newBalance = $this->customerRepo->settleDue($customer, $settleAmount);
 
@@ -173,6 +214,24 @@ class CustomerController extends Controller
             $method,
             $bankAccountId,
             $validated['note'] ?? null
+        );
+
+        // Audit Log: Customer Due Balance Settled
+        $this->auditService->log(
+            event: 'customer_due_settled',
+            auditableType: 'App\Models\Customer',
+            auditableId: $customer->id,
+            oldValues: [
+                'due_balance' => $oldBalance,
+            ],
+            newValues: [
+                'customer_name' => $customer->name,
+                'settle_amount' => $settleAmount,
+                'payment_method' => $method,
+                'new_due_balance' => $newBalance,
+                'note' => $validated['note'] ?? 'Due collection',
+            ],
+            userId: auth()->id() ?? 1
         );
 
         return response()->json([
@@ -205,7 +264,23 @@ class CustomerController extends Controller
         }
 
         $customerName = $customer->name;
+        $oldData = [
+            'name' => $customer->name,
+            'customer_code' => $customer->customer_code,
+            'phone' => $customer->phone,
+        ];
+
         $this->customerRepo->delete($customer);
+
+        // Audit Log: Customer Deleted
+        $this->auditService->log(
+            event: 'customer_deleted',
+            auditableType: 'App\Models\Customer',
+            auditableId: $id,
+            oldValues: $oldData,
+            newValues: null,
+            userId: auth()->id() ?? 1
+        );
 
         return response()->json([
             'success' => true,

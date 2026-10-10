@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Contracts\Repositories\AccountingRepositoryInterface;
 use App\Contracts\Repositories\BankAccountRepositoryInterface;
 use App\Contracts\Services\AccountingServiceInterface;
+use App\Contracts\Services\AuditServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\ChartOfAccount;
@@ -17,7 +18,8 @@ class AccountingController extends Controller
     public function __construct(
         protected AccountingRepositoryInterface $accountingRepo,
         protected AccountingServiceInterface $accountingService,
-        protected ?BankAccountRepositoryInterface $bankRepo = null
+        protected ?BankAccountRepositoryInterface $bankRepo = null,
+        protected ?AuditServiceInterface $auditService = null
     ) {
     }
 
@@ -306,6 +308,7 @@ class AccountingController extends Controller
         return response()->json([
             'success' => true,
             'accounts' => $accounts,
+            'chart_of_accounts' => $accounts,
         ]);
     }
 
@@ -492,6 +495,23 @@ class AccountingController extends Controller
 
         $entry = $this->accountingRepo->createJournalEntry($entryData, $items);
 
+        // Audit Log: Cash Deposit
+        if ($this->auditService) {
+            $this->auditService->log(
+                event: 'cash_deposit',
+                auditableType: 'App\Models\ChartOfAccount',
+                auditableId: $cashAccount->id,
+                oldValues: null,
+                newValues: [
+                    'amount' => $amount,
+                    'source_type' => $sourceType,
+                    'note' => $note,
+                    'voucher_number' => $entry->entry_number,
+                ],
+                userId: auth()->id() ?? 1
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => "৳" . number_format($amount, 2) . " successfully added to Cash in Hand. Voucher #{$entry->entry_number} recorded.",
@@ -565,6 +585,23 @@ class AccountingController extends Controller
         ];
 
         $entry = $this->accountingRepo->createJournalEntry($entryData, $items);
+
+        // Audit Log: Cash Withdrawal
+        if ($this->auditService) {
+            $this->auditService->log(
+                event: 'cash_withdraw',
+                auditableType: 'App\Models\ChartOfAccount',
+                auditableId: $cashAccount->id,
+                oldValues: null,
+                newValues: [
+                    'amount' => $amount,
+                    'destination_type' => $destType,
+                    'note' => $note,
+                    'voucher_number' => $entry->entry_number,
+                ],
+                userId: auth()->id() ?? 1
+            );
+        }
 
         return response()->json([
             'success' => true,

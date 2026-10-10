@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\Repositories\PurchaseRepositoryInterface;
+use App\Contracts\Services\AuditServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,7 +11,8 @@ use Illuminate\Http\Request;
 class PurchaseController extends Controller
 {
     public function __construct(
-        protected PurchaseRepositoryInterface $purchaseRepo
+        protected PurchaseRepositoryInterface $purchaseRepo,
+        protected AuditServiceInterface $auditService
     ) {
     }
 
@@ -59,6 +61,23 @@ class PurchaseController extends Controller
         $userId = auth()->id() ?? 1;
         $purchase = $this->purchaseRepo->create($validated, $validated['items'], $userId);
 
+        // Audit Log: Purchase Order Created
+        $this->auditService->log(
+            event: 'purchase_created',
+            auditableType: 'App\Models\Purchase',
+            auditableId: $purchase->id,
+            oldValues: null,
+            newValues: [
+                'purchase_number' => $purchase->purchase_number,
+                'supplier_name' => $purchase->supplier_name,
+                'total_amount' => (float) $purchase->total_amount,
+                'status' => $purchase->status,
+                'payment_method' => $purchase->payment_method,
+                'items_count' => count($validated['items']),
+            ],
+            userId: $userId
+        );
+
         $msg = $purchase->status === 'received'
             ? "Purchase Order #{$purchase->purchase_number} recorded & goods received into stock successfully."
             : "Purchase Order #{$purchase->purchase_number} created in Pending state. Awaiting physical goods receipt.";
@@ -92,6 +111,23 @@ class PurchaseController extends Controller
 
         try {
             $updated = $this->purchaseRepo->receive($purchase, $userId);
+
+            // Audit Log: Goods Received Note (GRN)
+            $this->auditService->log(
+                event: 'goods_received',
+                auditableType: 'App\Models\Purchase',
+                auditableId: $updated->id,
+                oldValues: ['status' => 'pending'],
+                newValues: [
+                    'status' => 'received',
+                    'received_by' => $userId,
+                    'received_at' => (string) $updated->received_at,
+                    'purchase_number' => $updated->purchase_number,
+                    'supplier_name' => $updated->supplier_name,
+                    'total_amount' => (float) $updated->total_amount,
+                ],
+                userId: $userId
+            );
 
             return response()->json([
                 'success' => true,
