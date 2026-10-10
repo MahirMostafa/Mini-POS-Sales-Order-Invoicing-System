@@ -44,11 +44,11 @@ export default function ProfitLossReport() {
     fetchProfitLoss();
   }, [startDate, endDate]);
 
-  const netSales = Number(profitLoss?.net_sales || 0);
-  const cogs = Number(profitLoss?.cogs || 0);
-  const grossProfit = Number(profitLoss?.gross_profit || 0);
-  const expenses = Number(profitLoss?.total_expenses || 0);
-  const netProfit = Number(profitLoss?.net_profit || 0);
+  const netSales = Number(profitLoss?.net_sales ?? profitLoss?.sales_revenue ?? 0);
+  const cogs = Number(profitLoss?.cost_of_goods_sold ?? profitLoss?.cogs ?? 0);
+  const grossProfit = Number(profitLoss?.gross_profit ?? (netSales - cogs));
+  const expenses = Number(profitLoss?.total_expenses ?? 0);
+  const netProfit = Number(profitLoss?.net_profit ?? (grossProfit - expenses));
   const marginPct = netSales > 0 ? ((netProfit / netSales) * 100).toFixed(1) : 0;
 
   return (

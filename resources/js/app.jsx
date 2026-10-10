@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import Footer from './components/Footer';
 import PosTerminal from './pages/PosTerminal';
 import OrdersList from './pages/OrdersList';
 import OrderDetails from './pages/OrderDetails';
@@ -19,6 +20,7 @@ import UserManagement from './pages/UserManagement';
 import CustomerManagement from './pages/CustomerManagement';
 import RolePermissionManagement from './pages/RolePermissionManagement';
 import AuditLogs from './pages/AuditLogs';
+import DashboardPage from './pages/DashboardPage';
 
 // Standalone Accounting Report Pages
 import ReportsOverview from './pages/reports/ReportsOverview';
@@ -44,7 +46,13 @@ function ProtectedRoute({ children, requiredPermissions = [] }) {
   const hasAccess = hasPermission(requiredPermissions);
 
   if (!hasAccess) {
-    const defaultFallback = hasPermission(['view-pos']) ? '/pos' : (hasPermission(['view-accounting-dashboard']) ? '/accounts/reports' : '/pos');
+    const defaultFallback = hasPermission(['view-dashboard']) 
+      ? '/dashboard' 
+      : (hasPermission(['view-pos']) 
+          ? '/pos' 
+          : (hasPermission(['view-chart-of-accounts', 'view-accounting-dashboard']) 
+              ? '/accounts/reports/chart-of-accounts' 
+              : '/pos'));
     return (
       <div className="p-8 max-w-xl mx-auto my-12 bg-white rounded-3xl border border-rose-200 shadow-xl text-center space-y-4">
         <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 mx-auto">
@@ -65,7 +73,7 @@ function ProtectedRoute({ children, requiredPermissions = [] }) {
 }
 
 function DashboardLayout() {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, hasPermission } = useAuth();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -96,7 +104,9 @@ function DashboardLayout() {
   }
 
   const userRole = role || user?.roles?.[0]?.name || 'Admin';
-  const defaultPath = userRole === 'Accountant' ? '/accounts/reports' : '/pos';
+  const defaultPath = hasPermission(['view-dashboard']) 
+    ? '/dashboard' 
+    : (userRole === 'Accountant' ? '/accounts/reports/chart-of-accounts' : (hasPermission(['view-pos']) ? '/pos' : '/dashboard'));
 
   return (
     <div className="min-h-screen bg-slate-50 flex selection:bg-indigo-500 selection:text-white">
@@ -125,6 +135,16 @@ function DashboardLayout() {
         <main className="flex-1 pb-12 px-4 sm:px-6 lg:px-8 pt-6 max-w-7xl mx-auto w-full">
           <Routes>
             <Route path="/" element={<Navigate to={defaultPath} replace />} />
+
+            {/* Executive Dashboard */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute requiredPermissions={['view-dashboard']}>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* POS & Sales Routes */}
             <Route
@@ -241,11 +261,7 @@ function DashboardLayout() {
             {/* Standalone Separate Accounting Report Pages */}
             <Route
               path="/accounts/reports"
-              element={
-                <ProtectedRoute requiredPermissions={['view-accounting-dashboard', 'view-chart-of-accounts', 'view-cash-book', 'view-bank-book', 'view-day-book', 'view-ledger', 'view-journal-entries', 'view-trial-balance', 'view-profit-loss', 'view-balance-sheet']}>
-                  <ReportsOverview />
-                </ProtectedRoute>
-              }
+              element={<Navigate to="/accounts/reports/chart-of-accounts" replace />}
             />
 
             <Route
@@ -383,6 +399,9 @@ function DashboardLayout() {
             <Route path="*" element={<Navigate to={defaultPath} replace />} />
           </Routes>
         </main>
+
+        {/* Global App Footer */}
+        <Footer />
       </div>
     </div>
   );

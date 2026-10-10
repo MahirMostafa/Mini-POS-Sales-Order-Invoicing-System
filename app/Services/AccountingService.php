@@ -35,7 +35,7 @@ class AccountingService implements AccountingServiceInterface
 
         $items = [];
         $grandTotal = (float) $order->grand_total;
-        $paidAmount = (float) $order->paid_amount;
+        $paidAmount = min($grandTotal, max(0, (float) $order->paid_amount));
         $dueAmount = max(0, round($grandTotal - $paidAmount, 2));
         $netSales = (float) ($order->subtotal - $order->discount_amount);
         $taxAmount = (float) $order->tax_amount;

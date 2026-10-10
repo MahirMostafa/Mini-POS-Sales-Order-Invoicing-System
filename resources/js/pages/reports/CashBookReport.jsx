@@ -31,7 +31,9 @@ export default function CashBookReport() {
 
   // Add Cash / Opening Balance Modal State
   const [isAddCashModalOpen, setIsAddCashModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [banks, setBanks] = useState([]);
+  const [chartOfAccounts, setChartOfAccounts] = useState([]);
   const [addCashForm, setAddCashForm] = useState({
     amount: '',
     source_type: 'capital', // 'capital' | 'bank' | 'income'
@@ -39,7 +41,16 @@ export default function CashBookReport() {
     entry_date: today,
     note: 'Cash in Hand Opening Balance / Drawer Float',
   });
+  const [withdrawForm, setWithdrawForm] = useState({
+    amount: '',
+    destination_type: 'custom', // 'expense' | 'bank' | 'drawing' | 'custom'
+    bank_account_id: '',
+    account_id: '',
+    entry_date: today,
+    note: 'Payment of Tax / Output VAT Liability',
+  });
   const [submittingCash, setSubmittingCash] = useState(false);
+  const [submittingWithdraw, setSubmittingWithdraw] = useState(false);
 
   const fetchCashBook = async () => {
     setLoading(true);
@@ -72,9 +83,27 @@ export default function CashBookReport() {
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const res = await api.get('/accounting/accounts');
+      if (res.data.success) {
+        const accs = res.data.accounts || [];
+        setChartOfAccounts(accs);
+        // Default to Tax Payable 2010 if present
+        const taxAcc = accs.find(a => a.account_code === '2010');
+        if (taxAcc) {
+          setWithdrawForm(prev => ({ ...prev, account_id: taxAcc.id }));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchCashBook();
     fetchBanks();
+    fetchAccounts();
   }, [startDate, endDate]);
 
   const handleSearchSubmit = (e) => {
@@ -114,6 +143,39 @@ export default function CashBookReport() {
     }
   };
 
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingWithdraw(true);
+    try {
+      const res = await api.post('/accounting/cash/withdraw-money', withdrawForm);
+      Swal.fire({
+        icon: 'success',
+        title: 'Payout / Payment Recorded!',
+        text: res.data.message || `Successfully disbursed ${currency}${Number(withdrawForm.amount).toFixed(2)} from Cash in Hand.`,
+        timer: 2000,
+        showConfirmButton: false
+      });
+      setIsWithdrawModalOpen(false);
+      setWithdrawForm({
+        amount: '',
+        destination_type: 'custom',
+        bank_account_id: '',
+        account_id: chartOfAccounts.find(a => a.account_code === '2010')?.id || '',
+        entry_date: today,
+        note: '',
+      });
+      fetchCashBook();
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Payout Failed',
+        text: err.response?.data?.message || 'Could not record cash payment.'
+      });
+    } finally {
+      setSubmittingWithdraw(false);
+    }
+  };
+
   const entries = cashBook?.entries || [];
 
   return (
@@ -130,15 +192,26 @@ export default function CashBookReport() {
         onRefresh={fetchCashBook}
         loading={loading}
       >
-        {hasPermission(['add-cash-money', 'manage-cash-book']) && (
-          <button
-            onClick={() => setIsAddCashModalOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-colors shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Cash / Opening Float</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasPermission(['withdraw-cash-money', 'manage-cash-book']) && (
+            <button
+              onClick={() => setIsWithdrawModalOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+            >
+              <ArrowUpRight className="w-4 h-4 text-rose-400" />
+              <span>Pay Tax / Cash Payout</span>
+            </button>
+          )}
+          {hasPermission(['add-cash-money', 'manage-cash-book']) && (
+            <button
+              onClick={() => setIsAddCashModalOpen(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-700 transition-colors shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Cash / Deposit</span>
+            </button>
+          )}
+        </div>
       </ReportHeader>
 
       {/* Summary Stat Cards */}
@@ -371,6 +444,144 @@ export default function CashBookReport() {
                   className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {submittingCash ? 'Posting...' : 'Record Cash Inflow'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cash Payout / Tax Payment / Expense / Withdrawal Modal */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <ArrowUpRight className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Record Cash Outflow / Payout</h3>
+                  <p className="text-[10px] text-slate-400">Pay Tax Liability, Operating Expenses, or Deposit to Bank</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Disbursement Amount ({currency}) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0.01"
+                  placeholder="e.g. 1500.00"
+                  value={withdrawForm.amount}
+                  onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-mono font-bold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Payout Category / Destination *</label>
+                <select
+                  value={withdrawForm.destination_type}
+                  onChange={(e) => setWithdrawForm({ ...withdrawForm, destination_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                >
+                  <option value="custom">Clear Liability / Tax Payable (2010)</option>
+                  <option value="expense">Operating & Administrative Expense (5020)</option>
+                  <option value="bank">Deposit Cash into Bank Account (1020)</option>
+                  <option value="drawing">Owner Capital Drawing (3010)</option>
+                </select>
+              </div>
+
+              {/* Bank Selection */}
+              {withdrawForm.destination_type === 'bank' && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Target Bank Account *</label>
+                  <select
+                    required
+                    value={withdrawForm.bank_account_id}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, bank_account_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                  >
+                    <option value="">-- Choose Target Bank --</option>
+                    {banks.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.bank_name} - {b.account_name} ({currency}{Number(b.current_balance).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Chart of Accounts Head Selection for custom or specific expense */}
+              {(withdrawForm.destination_type === 'custom' || withdrawForm.destination_type === 'expense') && (
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Select Ledger Account Head *</label>
+                  <select
+                    required
+                    value={withdrawForm.account_id}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, account_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                  >
+                    <option value="">-- Select Chart of Account Head --</option>
+                    {chartOfAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.account_code} - {a.account_name} ({a.account_type})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Select <strong>2010 Tax Payable (Output VAT)</strong> to clear accrued tax liabilities, or any expense head.
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Payment Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={withdrawForm.entry_date}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, entry_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Particulars / Note</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. VAT Payment to NBR"
+                    value={withdrawForm.note}
+                    onChange={(e) => setWithdrawForm({ ...withdrawForm, note: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWithdrawModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingWithdraw}
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {submittingWithdraw ? 'Posting...' : 'Record Payment / Clear Liability'}
                 </button>
               </div>
             </form>

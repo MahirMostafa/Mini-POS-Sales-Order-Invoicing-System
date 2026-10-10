@@ -196,17 +196,23 @@ class EloquentAccountingRepository implements AccountingRepositoryInterface
                 'normal_balance' => $account->normal_balance,
                 'total_debit' => round($debitSum, 2),
                 'total_credit' => round($creditSum, 2),
+                'debit' => round($netDebit, 2),
+                'credit' => round($netCredit, 2),
                 'debit_balance' => round($netDebit, 2),
                 'credit_balance' => round($netCredit, 2),
                 'balance' => $account->normal_balance === 'Debit' ? round($debitSum - $creditSum, 2) : round($creditSum - $debitSum, 2),
             ];
         }
 
+        $difference = round(abs($totalDebit - $totalCredit), 2);
+
         return [
             'accounts' => $trialBalance,
+            'rows' => $trialBalance,
             'total_debit' => round($totalDebit, 2),
             'total_credit' => round($totalCredit, 2),
-            'is_balanced' => abs($totalDebit - $totalCredit) < 0.01,
+            'difference' => $difference,
+            'is_balanced' => $difference < 0.01,
         ];
     }
 
@@ -594,6 +600,7 @@ class EloquentAccountingRepository implements AccountingRepositoryInterface
             'other_income' => round($otherIncome, 2),
             'total_revenue' => round($totalRevenue, 2),
             'cost_of_goods_sold' => round($cogs, 2),
+            'cogs' => round($cogs, 2),
             'gross_profit' => round($grossProfit, 2),
             'gross_margin_percent' => $totalRevenue > 0 ? round(($grossProfit / $totalRevenue) * 100, 2) : 0,
             'expense_breakdown' => $expenseBreakdown,

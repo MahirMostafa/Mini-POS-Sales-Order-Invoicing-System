@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api/client';
 import Swal from 'sweetalert2';
 import { 
@@ -99,9 +99,9 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
     return (
       <div className="p-16 text-center text-slate-500">
         <p>Order not found.</p>
-        <button onClick={handleBack} className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white">
+        <Link to="/orders" className="mt-3 inline-block px-4 py-2 rounded-xl bg-indigo-600 text-xs font-bold text-white">
           Go Back
-        </button>
+        </Link>
       </div>
     );
   }
@@ -135,21 +135,30 @@ export default function OrderDetails({ orderId: propOrderId, onBack, onNavigateT
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       {/* Top Bar with Back button */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Orders
-        </button>
+        {onBack ? (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Orders
+          </button>
+        ) : (
+          <Link
+            to="/orders"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Orders
+          </Link>
+        )}
 
         <div className="flex items-center gap-2">
           {isCompleted && order.invoice && (
-            <button
-              onClick={() => handleNavigateInvoice(order.invoice.id)}
+            <Link
+              to={`/invoices/${order.invoice.id}`}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
             >
               <FileText className="w-4 h-4" /> View Invoice #{order.invoice.invoice_number}
-            </button>
+            </Link>
           )}
 
           {isPending && (

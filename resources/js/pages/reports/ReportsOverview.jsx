@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api/client';
 import {
   Calculator,
@@ -214,10 +214,10 @@ export default function ReportsOverview() {
           {reportCards.filter((c) => hasPermission(c.perms)).map((card) => {
             const CardIcon = card.icon;
             return (
-              <div
+              <Link
                 key={card.path}
-                onClick={() => navigate(card.path)}
-                className="bg-white rounded-3xl border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex flex-col justify-between"
+                to={card.path}
+                className="bg-white rounded-3xl border border-slate-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group flex flex-col justify-between block"
               >
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -243,7 +243,7 @@ export default function ReportsOverview() {
                   <span>Open Report</span>
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
@@ -257,13 +257,13 @@ export default function ReportsOverview() {
               <Clock className="w-4 h-4 text-indigo-600" />
               <h3 className="font-black text-sm text-slate-900">Recent Double-Entry Journal Postings</h3>
             </div>
-            <button
-              onClick={() => navigate('/accounts/reports/journal-entries')}
+            <Link
+              to="/accounts/reports/journal-entries"
               className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
             >
               <span>View All Entries</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            </Link>
           </div>
 
           <div className="overflow-x-auto">

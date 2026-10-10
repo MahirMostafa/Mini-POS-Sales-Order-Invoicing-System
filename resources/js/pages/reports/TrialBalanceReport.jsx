@@ -39,9 +39,12 @@ export default function TrialBalanceReport() {
     fetchTrialBalance();
   }, [asOfDate]);
 
-  const rows = (trialBalance?.rows || []).filter((r) => {
+  const rawRows = trialBalance?.accounts || trialBalance?.rows || [];
+  const rows = rawRows.filter((r) => {
+    const dr = Number(r.debit ?? r.debit_balance ?? 0);
+    const cr = Number(r.credit ?? r.credit_balance ?? 0);
     if (!hideZeroBalances) return true;
-    return Number(r.debit) > 0 || Number(r.credit) > 0;
+    return dr > 0 || cr > 0;
   });
 
   const isBalanced = trialBalance?.is_balanced ?? false;
@@ -146,10 +149,10 @@ export default function TrialBalanceReport() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                      {Number(row.debit) > 0 ? `${currency}${Number(row.debit).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                      {Number(row.debit ?? row.debit_balance ?? 0) > 0 ? `${currency}${Number(row.debit ?? row.debit_balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                      {Number(row.credit) > 0 ? `${currency}${Number(row.credit).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                      {Number(row.credit ?? row.credit_balance ?? 0) > 0 ? `${currency}${Number(row.credit ?? row.credit_balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
                     </td>
                   </tr>
                 ))

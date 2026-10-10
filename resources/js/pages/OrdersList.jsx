@@ -22,7 +22,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import CompleteOrderModal from '../components/CompleteOrderModal';
 
 export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
@@ -237,13 +237,13 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => navigate('/pos')}
+          <Link
+            to="/pos"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
           >
             <ShoppingBag className="w-4 h-4" />
             <span>New POS Sale</span>
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -435,13 +435,12 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-4 px-6 font-bold font-mono text-indigo-600">
-                        <button
-                          type="button"
-                          onClick={() => handleNavigateOrder(order.id)}
+                        <Link
+                          to={`/orders/${order.id}`}
                           className="hover:underline text-left cursor-pointer font-bold font-mono text-indigo-600"
                         >
                           {order.order_number}
-                        </button>
+                        </Link>
                       </td>
                       <td className="py-4 px-6">
                         <div className="font-bold text-slate-900">{order.customer?.name || 'Walk-in Customer'}</div>
@@ -482,15 +481,14 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                       </td>
                       <td className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleNavigateOrder(order.id)}
+                          <Link
+                            to={`/orders/${order.id}`}
                             className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-colors inline-flex items-center gap-1 font-bold text-[11px] cursor-pointer"
                             title="View order audit details"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>Details</span>
-                          </button>
+                          </Link>
 
                           {isPending && (
                             <button
@@ -504,15 +502,14 @@ export default function OrdersList({ onNavigateToOrder, onNavigateToInvoice }) {
                           )}
 
                           {isCompleted && (
-                            <button
-                              type="button"
-                              onClick={() => handleNavigateInvoice(order.invoice?.id || order.id)}
+                            <Link
+                              to={`/invoices/${order.invoice?.id || order.id}`}
                               className="p-1.5 rounded-lg border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors font-bold text-[11px] inline-flex items-center gap-1 cursor-pointer"
                               title="Print / View Invoice"
                             >
                               <FileText className="w-3.5 h-3.5" />
                               <span>Invoice</span>
-                            </button>
+                            </Link>
                           )}
 
                           {isPending && (

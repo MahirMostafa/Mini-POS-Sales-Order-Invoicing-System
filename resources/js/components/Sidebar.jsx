@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+  LayoutDashboard,
   Store,
   ShoppingCart,
   Receipt,
@@ -14,7 +15,6 @@ import {
   Users,
   ShieldCheck,
   Activity,
-  LogOut,
   ChevronRight,
   ChevronDown,
   ChevronLeft,
@@ -36,12 +36,25 @@ export default function Sidebar({
   isCollapsed = false,
   toggleCollapse
 }) {
-  const { user, role, logout, hasPermission } = useAuth();
+  const { user, role, hasPermission } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [reportsOpen, setReportsOpen] = useState(true);
 
   const navGroups = [
+    {
+      title: 'Overview',
+      items: [
+        {
+          path: '/dashboard',
+          label: 'Executive Dashboard',
+          icon: LayoutDashboard,
+          permissions: ['view-dashboard'],
+          badge: 'Live',
+          badgeColor: 'bg-indigo-100 text-indigo-700'
+        }
+      ]
+    },
     {
       title: 'POS & Sales',
       items: [
@@ -50,7 +63,7 @@ export default function Sidebar({
           label: 'POS Counter',
           icon: ShoppingCart,
           permissions: ['view-pos'],
-          badge: 'Live',
+          badge: 'POS',
           badgeColor: 'bg-emerald-100 text-emerald-700'
         },
         {
@@ -198,13 +211,20 @@ export default function Sidebar({
         {/* Brand Header */}
         <div className={`h-16 border-b border-slate-200 flex items-center justify-between bg-slate-50/50 ${isCollapsed ? 'px-3 justify-center' : 'px-5'
           }`}>
-          <div className={`flex items-center gap-3 min-w-0 ${isCollapsed ? 'justify-center' : ''}`}>
+          <Link
+            to="/dashboard"
+            onClick={() => {
+              if (setIsMobileOpen) setIsMobileOpen(false);
+            }}
+            className={`flex items-center gap-3 min-w-0 group hover:opacity-90 transition-opacity ${isCollapsed ? 'justify-center' : ''}`}
+            title="MINI POS & ERP"
+          >
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0">
               <Store className="w-5 h-5" />
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
-                <div className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5 truncate">
+                <div className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5 truncate group-hover:text-indigo-600 transition-colors">
                   MINI POS & ERP
                 </div>
                 <div className="text-[11px] font-medium text-slate-400 truncate">
@@ -212,7 +232,7 @@ export default function Sidebar({
                 </div>
               </div>
             )}
-          </div>
+          </Link>
         </div>
 
         {/* Navigation Links */}
@@ -247,34 +267,43 @@ export default function Sidebar({
 
                       return (
                         <div key={item.path} className="space-y-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReportsOpen(!reportsOpen);
-                              if (location.pathname !== item.path && !location.pathname.startsWith('/accounts/reports')) {
-                                handleNavClick(item.path);
-                              }
-                            }}
+                          <div
                             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
                               isParentActive
                                 ? 'bg-indigo-50 text-indigo-700 font-bold'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                             }`}
                           >
-                            <div className="flex items-center gap-3">
+                            <Link
+                              to={item.path}
+                              onClick={() => {
+                                if (setIsMobileOpen) setIsMobileOpen(false);
+                              }}
+                              className="flex items-center gap-3 flex-1 min-w-0"
+                            >
                               <Icon
                                 className={`w-4 h-4 transition-colors shrink-0 ${
                                   isParentActive ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-700'
                                 }`}
                               />
                               <span className="truncate">{item.label}</span>
-                            </div>
-                            <ChevronDown
-                              className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
-                                reportsOpen ? 'rotate-180' : ''
-                              }`}
-                            />
-                          </button>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setReportsOpen(!reportsOpen);
+                              }}
+                              className="p-1 -mr-1 rounded-lg hover:bg-slate-200/60 transition-colors text-slate-400 hover:text-slate-600"
+                              title={reportsOpen ? 'Collapse sub-menu' : 'Expand sub-menu'}
+                            >
+                              <ChevronDown
+                                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                  reportsOpen ? 'rotate-180' : ''
+                                }`}
+                              />
+                            </button>
+                          </div>
 
                           {/* Submenu of Reports */}
                           {reportsOpen && (
@@ -282,10 +311,12 @@ export default function Sidebar({
                               {visibleSubItems.map((sub) => {
                                 const isSubActive = location.pathname === sub.path;
                                 return (
-                                  <button
+                                  <Link
                                     key={sub.path}
-                                    type="button"
-                                    onClick={() => handleNavClick(sub.path)}
+                                    to={sub.path}
+                                    onClick={() => {
+                                      if (setIsMobileOpen) setIsMobileOpen(false);
+                                    }}
                                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors flex items-center justify-between ${
                                       isSubActive
                                         ? 'bg-indigo-600 text-white font-bold shadow-xs'
@@ -294,7 +325,7 @@ export default function Sidebar({
                                   >
                                     <span className="truncate">{sub.label}</span>
                                     {isSubActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-                                  </button>
+                                  </Link>
                                 );
                               })}
                             </div>
@@ -304,10 +335,12 @@ export default function Sidebar({
                     }
 
                     return (
-                      <button
+                      <Link
                         key={item.path}
-                        type="button"
-                        onClick={() => handleNavClick(item.path)}
+                        to={item.path}
+                        onClick={() => {
+                          if (setIsMobileOpen) setIsMobileOpen(false);
+                        }}
                         title={isCollapsed ? item.label : undefined}
                         className={`w-full flex items-center rounded-xl text-xs font-semibold transition-all group ${isCollapsed
                             ? 'justify-center p-3'
@@ -340,7 +373,7 @@ export default function Sidebar({
                             />
                           )
                         )}
-                      </button>
+                      </Link>
                     );
                   })}
                 </div>
@@ -348,20 +381,6 @@ export default function Sidebar({
             );
           })}
         </nav>
-
-        {/* Bottom Logout Button */}
-        <div className={`border-t border-slate-200 bg-slate-50/50 ${isCollapsed ? 'p-2' : 'p-4'}`}>
-          <button
-            type="button"
-            onClick={logout}
-            title={isCollapsed ? 'Sign Out Session' : undefined}
-            className={`w-full flex items-center justify-center gap-2 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all ${isCollapsed ? 'p-3' : 'px-3 py-2'
-              }`}
-          >
-            <LogOut className="w-4 h-4 shrink-0" />
-            {!isCollapsed && <span>Sign Out Session</span>}
-          </button>
-        </div>
       </aside>
     </>
   );

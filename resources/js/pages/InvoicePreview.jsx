@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api/client';
 import { 
   Printer, 
@@ -184,13 +184,13 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => navigate('/pos')}
+            <Link
+              to="/pos"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
             >
               <ShoppingBag className="w-4 h-4" />
               <span>New POS Sale</span>
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -379,21 +379,21 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
                     return (
                       <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-4 px-6 font-bold font-mono text-indigo-600">
-                          <button
-                            onClick={() => handleSelectInvoice(inv.id)}
+                          <Link
+                            to={`/invoices/${inv.id}`}
                             className="hover:underline font-bold"
                           >
                             {inv.invoice_number}
-                          </button>
+                          </Link>
                         </td>
                         <td className="py-4 px-6 font-mono text-slate-600">
                           {inv.order ? (
-                            <button
-                              onClick={() => navigate(`/orders/${inv.order.id}`)}
+                            <Link
+                              to={`/orders/${inv.order.id}`}
                               className="text-slate-700 hover:text-indigo-600 hover:underline"
                             >
                               {inv.order.order_number}
-                            </button>
+                            </Link>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
@@ -434,14 +434,13 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
                           </span>
                         </td>
                         <td className="py-4 px-6 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectInvoice(inv.id)}
+                          <Link
+                            to={`/invoices/${inv.id}`}
                             className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all font-bold text-[11px] inline-flex items-center gap-1.5 shadow-xs"
                           >
                             <Printer className="w-3.5 h-3.5 text-indigo-600" />
                             <span>Preview & Print</span>
-                          </button>
+                          </Link>
                         </td>
                       </tr>
                     );
@@ -540,22 +539,31 @@ export default function InvoicePreview({ invoiceId: propInvoiceId, onBack, onSel
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       {/* Top action controls (Hidden during print) */}
       <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Invoices Registry
-        </button>
+        {onBack ? (
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Invoices Registry
+          </button>
+        ) : (
+          <Link
+            to="/invoices"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Invoices Registry
+          </Link>
+        )}
 
         <div className="flex items-center gap-2">
           {invoice.order?.id && (
-            <button
-              onClick={() => navigate(`/orders/${invoice.order.id}`)}
+            <Link
+              to={`/orders/${invoice.order.id}`}
               className="flex items-center gap-1.5 text-xs text-slate-700 font-bold px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
             >
               <FileText className="w-3.5 h-3.5 text-indigo-600" />
               <span>Order #{invoice.order?.order_number}</span>
-            </button>
+            </Link>
           )}
 
           <button

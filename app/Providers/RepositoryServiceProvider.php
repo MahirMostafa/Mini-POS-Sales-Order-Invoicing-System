@@ -35,6 +35,8 @@ use App\Contracts\Repositories\RolePermissionRepositoryInterface;
 use App\Repositories\EloquentRolePermissionRepository;
 use App\Contracts\Repositories\SettingRepositoryInterface;
 use App\Repositories\EloquentSettingRepository;
+use App\Contracts\Repositories\DashboardRepositoryInterface;
+use App\Repositories\EloquentDashboardRepository;
 
 // Service Contracts & Implementations
 use App\Contracts\Services\OrderServiceInterface;
@@ -47,6 +49,8 @@ use App\Contracts\Services\InvoiceServiceInterface;
 use App\Services\InvoiceService;
 use App\Contracts\Services\AuditServiceInterface;
 use App\Services\AuditService;
+use App\Contracts\Services\DashboardServiceInterface;
+use App\Services\DashboardService;
 
 class RepositoryServiceProvider extends ServiceProvider
 {
@@ -68,6 +72,7 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(UserRepositoryInterface::class, EloquentUserRepository::class);
         $this->app->bind(RolePermissionRepositoryInterface::class, EloquentRolePermissionRepository::class);
         $this->app->bind(SettingRepositoryInterface::class, EloquentSettingRepository::class);
+        $this->app->bind(DashboardRepositoryInterface::class, EloquentDashboardRepository::class);
 
         // Bind Services
         $this->app->bind(OrderServiceInterface::class, OrderService::class);
@@ -75,6 +80,7 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(InventoryServiceInterface::class, InventoryService::class);
         $this->app->bind(InvoiceServiceInterface::class, InvoiceService::class);
         $this->app->bind(AuditServiceInterface::class, AuditService::class);
+        $this->app->bind(DashboardServiceInterface::class, DashboardService::class);
     }
 
     public function boot(): void

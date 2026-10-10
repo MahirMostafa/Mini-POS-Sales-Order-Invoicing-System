@@ -4,218 +4,123 @@
 [![React 19](https://img.shields.io/badge/React-19.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-7.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-12.x-black?style=for-the-badge&logo=framer&logoColor=blue)](https://www.framer.com/motion/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-A robust, enterprise-grade **Point of Sale (POS), Sales Order Processing, and Invoicing System** built with **Laravel 11**, **React 19**, **Vite**, **Tailwind CSS**, and an integrated **Double-Entry General Ledger Accounting Engine**.
+A robust, enterprise-grade **Point of Sale (POS), Sales Order Processing, and Invoicing System** built with **Laravel 11**, **React 19**, **Vite**, **Tailwind CSS**, **Framer Motion**, and an integrated **Double-Entry General Ledger Accounting Engine**.
 
 ---
 
-## System Overview
+## 🌟 Key Highlights & Architecture
 
-This system bridges the gap between front-end point-of-sale operations and back-office corporate accounting. Every business transaction—whether a retail checkout at the counter, a wholesale order with credit terms, a purchase order receipt, or a cash-to-bank transfer—atomically updates inventory levels and posts balanced, GAAP-compliant double-entry journal vouchers to the General Ledger in real time.
+- **Full-Stack Separation**: Decoupled React 19 Single Page Application (SPA) powered by a clean, testable Laravel 11 REST API with the **Repository & Service Layer Pattern**.
+- **Real-Time Double-Entry Accounting**: Automatic balanced journal entries (`SUM(Debits) == SUM(Credits)`) posted on every transaction (Sales Invoices, COGS, Cash Flow, Bank Settlements, Purchases, Customer Credit, and VAT Liabilities).
+- **Scalable 5,000 Product Inventory**: High-performance chunked pagination (100 products per page), interactive "Load More" with **Framer Motion** transitions, and instant full-database search across all 5,000 products by SKU, barcode, brand, and name.
+- **Granular Role-Based Access Control (Spatie RBAC)**: Strict role matrices for `Admin`, `Accountant`, `Cashier`, and a specialized `Store Keeper` role restricted exclusively to Goods Received Note (GRN) verification.
+- **Enterprise Forensic Audit Trail**: Dedicated asynchronous audit logging capturing state diffs (before vs after) for purchases, goods receipts, bank transactions, cash withdrawals, price revisions, product lifecycle changes, and customer due settlements.
+- **Secure Authentication & Instant Demo Logins**: Protected by visual mathematical CAPTCHAs, rate-limiting brute force protection (60s cooldown timer), and 1-click Instant Demo Logins.
 
 ---
 
-## Core Feature Modules
+## 🛠️ Feature Modules
 
 ### 1. Interactive POS Terminal & Checkout
-- **Instant Product Lookup**: Category filtering, real-time multi-field search (Name, SKU, Barcode, Brand), and live barcode scanner input support.
-- **Multi-Variant Product Architecture**: Seamlessly handle multiple variations per product (e.g., sizes, volumes, colors) with independent SKU tracking and dynamic selling prices.
-- **Real-Time Calculation Engine**: Live recalculation of Subtotal, Item-level Discounts, Flat/Percentage Cart Discounts, Configurable Tax Rates (e.g., 5% Standard VAT), and Rounding Adjustments.
-- **Multi-Tender Payment Gateway**:
-  - **Cash in Hand**: Instant change calculation and denomination quick-add presets.
-  - **Card / POS Terminal**: Direct integration debiting bank accounting heads with exact payable enforcement.
-  - **Bank / Digital Transfer**: Real-time selection across registered company bank accounts without exposing internal bank balances to store cashiers.
-  - **Credit / Due Sales**: Allowed exclusively for registered customers with real-time Accounts Receivable tracking.
-- **Instant Receipt & Invoice Generation**: Native 80mm thermal receipt modal and standard printable tax invoices.
+- **Scalable Catalog**: Paginated 100-item grid with fluid Framer Motion animations and live percentage progress bar.
+- **Global Inventory Search**: Search by product title, brand, variant name, SKU (`PRD-00001` to `PRD-05000`), or Barcode (`890100000001` to `890100005000`) across all 5,000 items in real time.
+- **Live Barcode Scanner**: Hardware-compatible barcode reader input that queries the full inventory and adds matching items directly to the sales cart.
+- **Multi-Variant Architecture**: Multi-attribute variant support (e.g. *Perfume - ABC* in 80ml, 120ml, 200ml) with independent cost and selling prices.
+- **Multi-Tender Payments**:
+  - **Cash in Hand**: Instant change calculation and quick-add denomination presets.
+  - **Card / POS Terminal**: Direct debit to bank accounting heads.
+  - **Digital Wallet / MFS**: bKash Merchant QR integration with payment reference tracking.
+  - **Credit / Due Sales**: Permitted exclusively for registered customers with automatic Accounts Receivable ledger updates.
+- **Thermal Receipts & Invoices**: Native 80mm thermal receipt generator modal and downloadable printable tax invoices.
 
-### 2. Sales Order & Lifecycle Management
-- **Order State Machine**: Strict lifecycle flow (`Draft` / `Pending` -> `Completed` -> `Cancelled`).
-- **Atomic Stock Verification**: Orders in `Pending` status reserve inventory logically; transitioning to `Completed` atomically validates stock availability, deducts inventory at the variant SKU level, generates the official invoice, and posts ledger entries.
-- **Unified Completion Workflow**: Harmonized payment and accounting modal across the POS Terminal, Order Lists, and Order Details views.
-
-### 3. Procurement & Purchase Order Management
-- **Two-Stage Purchase Receiving**: Purchase orders transition from `Pending` to `Received` upon physical warehouse inspection.
-- **Supplier & Landed Cost Tracking**: Manage supplier profiles, unit purchase costs, tax implications, and automatic weighted average cost (WAC) recalculations.
-- **Printable Purchase Vouchers**: Print-ready purchase orders with supplier details, line-item audits, and authorized signature placeholders.
-
-### 4. Real-Time Double-Entry Accounting & Banking Engine
-- **Pre-Configured Chart of Accounts**:
+### 2. Real-Time Double-Entry Accounting & Banking
+- **Standard Chart of Accounts (COA)**:
   - `1010` Cash in Hand (Asset)
   - `1020` Bank Accounts (Asset)
   - `1050` Accounts Receivable (Asset)
   - `1060` Merchandise Inventory (Asset)
-  - `2010` Tax Payable / Output VAT (Liability)
+  - `2010` Tax / VAT Output Liability (Liability)
   - `2020` Accounts Payable (Liability)
   - `3010` Owner's Capital / Equity (Equity)
   - `4010` Sales Revenue (Revenue)
-  - `5010` Cost of Goods Sold (COGS) (Expense)
-- **Automatic Balanced Journal Entries**: System guarantees `SUM(Debits) == SUM(Credits)` on every transaction before committing database transactions.
-- **Dedicated Bank Management**:
-  - Multi-bank account registration (Bank Name, Account Name, Account Number, Branch, Routing Number).
+  - `5010` Cost of Goods Sold / COGS (Expense)
+- **Multi-Bank Management**:
+  - Registered anonymous enterprise accounts (e.g. *Corporate Operating Account*, *Reserve & Vendor Settlement Account*, *POS Digital Merchant QR*).
   - Real-time Bank Book with chronological running balance calculations.
-  - Inter-account fund transfers and cash-to-bank deposits/withdrawals with automated contra vouchers.
+  - Inter-bank fund transfers and cash-to-bank deposits/withdrawals with automated contra vouchers.
 - **Cash Management**:
-  - Real-time Cash Book tracking daily counter collections, petty cash disbursements, and bank settlements.
+  - Real-time Cash Book tracking daily counter collections, petty cash disbursements, and bank deposits.
 
-### 5. Granular Financial & Operational Reporting
-A decoupled suite of 10 standalone financial report components equipped with custom date range filters, presets (Today, Yesterday, Last 7 Days, This Month), CSV export, and print optimization:
-1. **Balance Sheet**: Comprehensive financial position statement (Assets = Liabilities + Equity).
-2. **Income Statement (Profit & Loss)**: Operating revenues, cost of goods sold, gross profit, operating expenses, and net profit.
-3. **Trial Balance**: Real-time validation of all ledger accounts with zero-sum verification.
-4. **General Ledger**: Account-by-account transaction drill-down with running debit and credit balances.
-5. **Cash Book**: Complete ledger of all cash receipts and disbursements.
-6. **Bank Book**: Multi-bank account transaction history with chronological balances.
-7. **Day Book**: Daily chronological digest of all operational vouchers.
-8. **Tax / VAT Report**: Output tax collected vs input tax paid for statutory compliance.
-9. **Sales by Customer Report**: Aggregate sales volume, invoices, and revenue breakdown per customer account.
-10. **Sales by Item Report**: Product and variant sales volume, unit pricing, discounts, and total revenue performance.
+### 3. Financial Statements & Operational Reporting Suite
+10 decoupled, printable, and exportable financial statements with custom date filters and presets:
+1. **Balance Sheet**: Full financial position statement ($Assets = Liabilities + Equity$).
+2. **Income Statement (Profit & Loss)**: Revenues, COGS, gross profit, operational expenses, and net profit.
+3. **Trial Balance**: Zero-sum mathematical verification of all debit and credit balances.
+4. **General Ledger**: Account-by-account transaction drill-down with running balances.
+5. **Cash Book**: Chronological ledger of cash receipts, collections, and disbursements.
+6. **Bank Book**: Multi-bank account transaction history with live running balances.
+7. **Day Book**: Daily operational digest of all journal vouchers.
+8. **Tax / VAT Report**: Output VAT collected vs Input VAT paid for statutory compliance.
+9. **Sales by Customer Report**: Aggregated volume, invoice count, and revenue per customer.
+10. **Sales by Item Report**: Product and variant unit sales, discounts, and total revenue.
 
-### 6. Customer & Credit Management
-- Customer directory with unique customer codes, contact details, and credit limits.
-- Customer balance tracking and settlement collection directly into Cash or Bank accounts with automated Accounts Receivable reconciliation.
+### 4. Procurement & Two-Stage Purchase Orders
+- **Procurement Workflow**: Purchase Orders (`Pending` -> `Received`).
+- **Store Keeper Verification**: Store Keepers verify physical shipments, replenish variant stock, and confirm Goods Received Notes (GRN) with automatic inventory asset journals.
 
-### 7. Role-Based Access Control (RBAC)
-- Built on **Spatie Laravel Permission**.
-- Granular permission matrix controlling access to POS checkout, order completion, purchase orders, bank account management, cash transfers, user roles, and each individual financial report.
-- Pre-configured roles: `Admin`, `Manager`, `Accountant`, and `Cashier`.
-
-### 8. Comprehensive Enterprise Audit Logging
-- **Automated Activity Tracking**: Immutable audit trails logging every critical business action, including:
-  - Sales order creations, status transitions, and cancellations.
-  - Purchase order creation and inventory receipt verifications.
-  - Inventory quantity adjustments and variant pricing updates.
-  - Bank and cash deposits, withdrawals, and inter-account transfers.
-  - Customer profile modifications and credit settlements.
-  - System configuration and tax rate changes.
-  - Role, permission, and user credential modifications.
-- **Detailed Forensic Data**: Each audit entry records the initiating user ID, action type, affected model, old vs new JSON snapshots, client IP address, user agent, and timestamp.
+### 5. Enterprise Forensic Audit Trail
+- **Comprehensive Event Logging**:
+  - `purchase_created`: Purchase order placed with supplier details and line items.
+  - `goods_received`: GRN confirmation with receiving store keeper timestamp.
+  - `bank_created`, `bank_deposit`, `bank_withdraw`: Bank registration, inflows, and outflows.
+  - `cash_deposit`, `cash_withdraw`: Cash register additions and withdrawals with reason.
+  - `product_created`, `price_changed`, `product_deleted`: Product lifecycle & **exact before/after price diffs**.
+  - `category_created`, `category_updated`, `category_deleted`: Category taxonomy tracking.
+  - `customer_due_settled`: Customer payment collection with remaining due calculation.
+  - `order_created`, `order_completed`, `order_cancelled`: Sales orders and invoicing.
+- **Audit Diff Inspector**: Interactive modal displaying actor, client IP address, human narrative, and state diff JSON snapshots.
 
 ---
 
-## Architectural Design & Directory Structure
+## 👥 Seeded Users & Demo Credentials
 
-The application strictly adheres to the **Repository & Service Layer Pattern**, ensuring high testability, separation of concerns, and clean SOLID principles.
+Default Password for all seeded accounts: `password123`
 
-```
-app/
-├── Contracts/
-│   ├── Repositories/
-│   │   ├── AccountingRepositoryInterface.php
-│   │   ├── BankAccountRepositoryInterface.php
-│   │   ├── CustomerRepositoryInterface.php
-│   │   ├── InvoiceRepositoryInterface.php
-│   │   ├── OrderRepositoryInterface.php
-│   │   ├── ProductRepositoryInterface.php
-│   │   ├── ProductVariantRepositoryInterface.php
-│   │   ├── PurchaseRepositoryInterface.php
-│   │   ├── StockMovementRepositoryInterface.php
-│   │   └── TaxRateRepositoryInterface.php
-│   └── Services/
-│       ├── AccountingServiceInterface.php
-│       ├── InventoryServiceInterface.php
-│       ├── InvoiceServiceInterface.php
-│       └── OrderServiceInterface.php
-├── Http/
-│   ├── Controllers/
-│   │   ├── AccountingController.php
-│   │   ├── AuthController.php
-│   │   ├── BankAccountController.php
-│   │   ├── CustomerController.php
-│   │   ├── InvoiceController.php
-│   │   ├── OrderController.php
-│   │   ├── PosController.php
-│   │   ├── ProductController.php
-│   │   ├── PurchaseController.php
-│   │   ├── RolePermissionController.php
-│   │   └── TaxRateController.php
-│   └── Requests/
-│       ├── CompleteOrderRequest.php
-│       ├── StoreCustomerRequest.php
-│       ├── StoreOrderRequest.php
-│       ├── StoreProductRequest.php
-│       └── StorePurchaseRequest.php
-├── Models/
-│   ├── AuditLog.php
-│   ├── BankAccount.php
-│   ├── ChartOfAccount.php
-│   ├── Customer.php
-│   ├── Invoice.php
-│   ├── JournalEntry.php
-│   ├── JournalItem.php
-│   ├── Order.php
-│   ├── OrderItem.php
-│   ├── Product.php
-│   ├── ProductCategory.php
-│   ├── ProductVariant.php
-│   ├── Purchase.php
-│   ├── PurchaseItem.php
-│   ├── StockMovement.php
-│   ├── Supplier.php
-│   └── TaxRate.php
-├── Repositories/
-│   ├── EloquentAccountingRepository.php
-│   ├── EloquentBankAccountRepository.php
-│   ├── EloquentCustomerRepository.php
-│   ├── EloquentInvoiceRepository.php
-│   ├── EloquentOrderRepository.php
-│   ├── EloquentProductRepository.php
-│   ├── EloquentPurchaseRepository.php
-│   └── EloquentStockMovementRepository.php
-├── Services/
-│   ├── AccountingService.php
-│   ├── InventoryService.php
-│   ├── InvoiceService.php
-│   └── OrderService.php
-└── Providers/
-    └── RepositoryServiceProvider.php
+### Instant 1-Click Demo Accounts (Featured on Login Screen)
 
-resources/js/
-├── api/
-│   └── client.js                  # Axios client with bearer token injection & interceptors
-├── components/
-│   ├── CompleteOrderModal.jsx     # Order completion modal
-│   ├── PosPaymentModal.jsx        # POS payment & accounting allocation modal
-│   ├── PosThermalReceiptModal.jsx # 80mm thermal receipt generator
-│   ├── ReportHeader.jsx           # Unified financial report header with filters & actions
-│   └── Sidebar.jsx                # Responsive navigation with permission filtering
-├── context/
-│   └── AuthContext.jsx            # Authentication state, active user, and Spatie permission checks
-└── pages/
-    ├── BankManagement.jsx         # Multi-bank account operations & transfer workflows
-    ├── CashManagement.jsx         # Cash in hand & counter drawer management
-    ├── CustomerManagement.jsx     # Customer ledger, dues, and settlements
-    ├── Dashboard.jsx              # Executive KPI metrics and financial summaries
-    ├── InvoicesList.jsx           # Sales invoices repository and print triggers
-    ├── OrdersList.jsx             # Sales orders management and completion
-    ├── PosTerminal.jsx            # Interactive retail POS terminal
-    ├── ProductCatalog.jsx         # Product and variant catalog management
-    ├── PurchaseManagement.jsx     # Two-stage procurement and purchase orders
-    ├── RolePermissionManagement.jsx # RBAC matrix and role assignments
-    └── reports/
-        ├── BalanceSheetReport.jsx
-        ├── BankBookReport.jsx
-        ├── CashBookReport.jsx
-        ├── DayBookReport.jsx
-        ├── GeneralLedgerReport.jsx
-        ├── IncomeStatementReport.jsx
-        ├── SalesByCustomerReport.jsx
-        ├── SalesByItemReport.jsx
-        ├── TaxReport.jsx
-        └── TrialBalanceReport.jsx
-```
+| Role | Name | Email | Password | Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Admin (Demo)** | Super Admin | `admin@pos.com` | `password123` | Full enterprise control, RBAC, Financials, Banking, Auditing |
+| **Accountant (Demo)** | Senior Accountant | `accountant1@pos.com` | `password123` | General Ledger, Chart of Accounts, Bank & Cash Books, Financial Reports |
+| **Cashier (Demo)** | Counter 1 Cashier | `counter1@pos.com` | `password123` | POS Terminal, Quick Customer Creation, Cash/Card Sales |
+
+### Additional Production Accounts
+
+| Role | Name | Email |
+| :--- | :--- | :--- |
+| **Admin** | Operations Admin | `admin.ops@pos.com` |
+| **Admin** | Store Admin | `admin.store@pos.com` |
+| **Accountant** | Junior Accountant | `accountant2@pos.com` |
+| **Cashier** | Counter 2 Cashier | `counter2@pos.com` |
+| **Cashier** | Counter 3 Cashier | `counter3@pos.com` |
+| **Cashier** | Counter 4 Cashier | `counter4@pos.com` |
+| **Cashier** | Counter 5 Cashier | `counter5@pos.com` |
+| **Store Keeper** | Warehouse Store Keeper | `storekeeper@pos.com` |
 
 ---
 
-## Installation & Setup Guide
+## 🚀 Installation & Quick Start Guide
 
 ### Prerequisites
-- **PHP**: 8.2 or higher
+- **PHP**: 8.2 or higher (with `pdo`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`)
 - **Composer**: 2.x
 - **Node.js**: 18.x or higher & NPM
-- **Database**: MySQL 8.0+ / MariaDB 10.4+ / PostgreSQL / SQLite
+- **Database**: MySQL 8.0+ / MariaDB 10.4+ / PostgreSQL
 
-### Step-by-Step Installation
+### Setup Instructions
 
 ```bash
 # 1. Clone the repository
@@ -232,15 +137,15 @@ npm install
 cp .env.example .env
 php artisan key:generate
 
-# 5. Configure your database connection in .env (DB_DATABASE, DB_USERNAME, DB_PASSWORD)
+# 5. Configure your database in .env (DB_DATABASE, DB_USERNAME, DB_PASSWORD)
 
-# 6. Execute database migrations and seed default data
+# 6. Run database migrations & seeders (Includes 5,000 products, COA, bank accounts, and 10 users)
 php artisan migrate:fresh --seed
 
 # 7. Compile frontend assets
 npm run build
 
-# 8. Start the development server
+# 8. Start development servers
 php artisan serve
 ```
 
@@ -248,44 +153,88 @@ The application will be accessible at: `http://localhost:8000`
 
 ---
 
-## Default Demo Credentials
+## 🏗️ Technical Architecture
 
-| Role | Email | Password | Access Scope |
-| :--- | :--- | :--- | :--- |
-| **System Administrator** | `admin@test.com` | `password` | Full system access, RBAC, Banking, Accounting, Auditing |
-| **Store Manager** | `manager@test.com` | `password` | POS, Sales Orders, Purchases, Inventory, Operational Reports |
-| **Lead Accountant** | `accountant@test.com` | `password` | Full Financial Suite, Bank Books, Journal Vouchers, Balance Sheet |
-| **POS Cashier** | `cashier@test.com` | `password` | POS Terminal, Quick Customer Creation, Order Completion |
-
----
-
-## Automated Testing Suite
-
-The application includes automated feature tests covering the complete transactional lifecycle:
-
-```bash
-# Run all automated tests
-php artisan test
-
-# Run POS, Order, and Double-Entry Accounting integration tests
-php artisan test --filter=PosOrderAccountingWorkflowTest
-
-# Run Product Stock and Accounting Rule verification tests
-php artisan test --filter=ProductStockAccountingRuleTest
+```
+app/
+├── Contracts/
+│   ├── Repositories/
+│   │   ├── AccountingRepositoryInterface.php
+│   │   ├── AuditLogRepositoryInterface.php
+│   │   ├── BankAccountRepositoryInterface.php
+│   │   ├── CategoryRepositoryInterface.php
+│   │   ├── CustomerRepositoryInterface.php
+│   │   ├── DashboardRepositoryInterface.php
+│   │   ├── InvoiceRepositoryInterface.php
+│   │   ├── OrderRepositoryInterface.php
+│   │   ├── ProductRepositoryInterface.php
+│   │   ├── ProductVariantRepositoryInterface.php
+│   │   ├── PurchaseRepositoryInterface.php
+│   │   ├── SettingRepositoryInterface.php
+│   │   ├── StockMovementRepositoryInterface.php
+│   │   ├── TaxRateRepositoryInterface.php
+│   │   └── UserRepositoryInterface.php
+│   └── Services/
+│       ├── AccountingServiceInterface.php
+│       ├── AuditServiceInterface.php
+│       ├── DashboardServiceInterface.php
+│       ├── InventoryServiceInterface.php
+│       ├── InvoiceServiceInterface.php
+│       └── OrderServiceInterface.php
+├── Http/Controllers/
+│   ├── AccountingController.php
+│   ├── AuditLogController.php
+│   ├── AuthController.php
+│   ├── BankAccountController.php
+│   ├── CategoryController.php
+│   ├── CustomerController.php
+│   ├── DashboardController.php
+│   ├── InvoiceController.php
+│   ├── OrderController.php
+│   ├── PosController.php
+│   ├── ProductController.php
+│   ├── PurchaseController.php
+│   ├── RolePermissionController.php
+│   ├── TaxRateController.php
+│   └── UserController.php
+├── Models/
+│   ├── AuditLog.php
+│   ├── BankAccount.php
+│   ├── ChartOfAccount.php
+│   ├── Customer.php
+│   ├── Invoice.php
+│   ├── InvoiceItem.php
+│   ├── JournalEntry.php
+│   ├── JournalItem.php
+│   ├── Order.php
+│   ├── OrderItem.php
+│   ├── Product.php
+│   ├── ProductCategory.php
+│   ├── ProductVariant.php
+│   ├── Purchase.php
+│   ├── PurchaseItem.php
+│   ├── Setting.php
+│   ├── StockMovement.php
+│   ├── TaxRate.php
+│   └── User.php
+└── Services/
+    ├── AccountingService.php
+    ├── AuditService.php
+    ├── DashboardService.php
+    ├── InventoryService.php
+    ├── InvoiceService.php
+    └── OrderService.php
 ```
 
 ---
 
-## Technical Stack Summary
+## 👨‍💻 Author & Credits
 
-- **Backend Framework**: Laravel 11.x
-- **Frontend Architecture**: React 19, React Router v6, Tailwind CSS, Lucide Icons, SweetAlert2
-- **Build Tool**: Vite 7.x
-- **Security & Authorization**: Laravel Sanctum, Spatie Laravel Permission
-- **Architecture**: Repository Pattern, Service Layer, Form Requests, Strict Double-Entry Ledger
+Developed with ❤️ by **Mahir Mostafa**  
+LinkedIn: [https://www.linkedin.com/in/mahirmostafa/](https://www.linkedin.com/in/mahirmostafa/)
 
 ---
 
-## License
+## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
