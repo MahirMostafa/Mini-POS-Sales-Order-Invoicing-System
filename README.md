@@ -22,6 +22,152 @@ A robust, enterprise-grade **Point of Sale (POS), Sales Order Processing, and In
 
 ---
 
+## 📸 Application User Interface Showcase
+
+### 1. Authentication & Security Gate
+> **Security CAPTCHA & Instant 1-Click Demo Login Selector**  
+> Visual mathematical challenge generator, brute-force rate limiting (60s cooldown), and one-click role switching for Admin, Accountant, and Cashier.
+
+![01 - Authentication & Login](screenshots/01_login_screen.png)
+
+---
+
+### 2. Executive Analytics Dashboard
+> **Real-Time KPI Metrics, Revenue Graphs & Transaction Pulse**  
+> Live summaries of daily sales, total collected revenue, open customer dues, inventory asset valuation, and recent accounting events.
+
+![02 - Executive Dashboard](screenshots/02_dashboard.png)
+
+---
+
+### 3. Interactive POS Terminal & Multi-Tender Checkout
+> **5,000 Product Catalog Grid with Instant Search & Multi-Variant Cart**  
+> High-performance catalog browsing with Framer Motion animations, real-time SKU/barcode scanner lookup, customer balance selector, dynamic VAT, and discount calculations.
+
+![03 - POS Terminal](screenshots/03_pos_terminal.png)
+
+> **Multi-Tender Checkout Modal**  
+> Split tender support including Cash with smart quick-change denominations, POS Card terminals, bKash Merchant Dynamic QR Code, and Customer Credit/Due.
+
+![04 - POS Checkout Modal](screenshots/04_pos_checkout_modal.png)
+
+---
+
+### 4. Sales Orders & Invoicing
+> **Sales Order Management Directory**  
+> Complete sales order registry with real-time status tracking (`Completed`, `Pending`, `Cancelled`), payment method tags, and customer association.
+
+![05 - Sales Orders Directory](screenshots/05_sales_orders.png)
+
+> **Sales Order Detail & Real-Time Journal Voucher Inspector**  
+> Comprehensive line-item breakdown, tax calculation, payment details, and linked double-entry journal transaction vouchers.
+
+![06 - Sales Order Details](screenshots/06_order_details.png)
+
+> **Tax Invoices & Thermal Receipt Generator**  
+> Official printable tax invoice directory and 80mm thermal receipt generator view.
+
+![07 - Tax Invoices & Receipts](screenshots/07_tax_invoices.png)
+
+---
+
+### 5. Inventory, Categories & Procurement
+> **Product Catalog & Multi-Variant Pricing Matrix**  
+> Full catalog management supporting multi-tier variants (attributes, SKU generation, cost prices, selling prices, and live stock tracking).
+
+![08 - Product Catalog](screenshots/08_product_catalog.png)
+
+> **Product Category Taxonomy**  
+> Hierarchical category management with item counts and category-level filtering.
+
+![09 - Category Management](screenshots/09_category_management.png)
+
+> **Procurement & Goods Received Note (GRN) Management**  
+> Two-stage purchase order procurement with Store Keeper verification, stock auto-increment, and accounts payable double-entry journal vouchers.
+
+![10 - Purchase Orders & GRN](screenshots/10_purchase_orders.png)
+
+> **Customer Directory & Due Settlement Ledger**  
+> Customer profiles, credit limit tracking, total purchases, loyalty points, and interactive due settlement modal.
+
+![11 - Customer Management](screenshots/11_customer_management.png)
+
+---
+
+### 6. Cash Register & Multi-Bank Management
+> **Cash Management & Real-Time Cash Book**  
+> Daily cash drawer monitoring, petty cash disbursements, deposits, and continuous running cash balance calculation.
+
+![12 - Cash Management](screenshots/12_cash_management.png)
+
+> **Multi-Bank Management & Bank Book**  
+> Enterprise bank account management, inter-bank fund transfers, card/MFS collection routing, and live chronological bank ledger.
+
+![13 - Bank Management](screenshots/13_bank_management.png)
+
+---
+
+### 7. Double-Entry General Ledger & Financial Reporting Suite
+> **Standard Chart of Accounts (COA)**  
+> 4-tier structured account hierarchy (Assets `1000`, Liabilities `2000`, Equity `3000`, Revenue `4000`, Expenses `5000`) with real-time head balances.
+
+![14 - Chart of Accounts](screenshots/14_chart_of_accounts.png)
+
+> **General Ledger (GL)**  
+> Chronological transaction ledger with running debit/credit balances, printable view, and date range filters.
+
+![15 - General Ledger](screenshots/15_general_ledger.png)
+
+> **Journal Entries / Vouchers**  
+> Real-time double-entry journal vouchers ensuring zero imbalance (`SUM(Debits) == SUM(Credits)`) on every automated and manual posting.
+
+![16 - Journal Entries](screenshots/16_journal_entries.png)
+
+> **Trial Balance Report**  
+> Instant trial balance verification with zero net discrepancy assurance across all financial heads.
+
+![17 - Trial Balance](screenshots/17_trial_balance.png)
+
+> **Income Statement (Profit & Loss)**  
+> Real-time P&L reporting broken down by Sales Revenue, Cost of Goods Sold (COGS), Gross Profit, and Net Operating Margin.
+
+![18 - Profit & Loss Statement](screenshots/18_profit_and_loss.png)
+
+> **Statement of Financial Position (Balance Sheet)**  
+> Standard balance sheet displaying complete assets, liabilities, and owners' equity ($Assets = Liabilities + Equity$).
+
+![19 - Balance Sheet](screenshots/19_balance_sheet.png)
+
+> **Day Book Operational Digest**  
+> Daily transaction digest summarizing all vouchers, cash movements, and sales entries for selected operational dates.
+
+![20 - Day Book](screenshots/20_day_book.png)
+
+---
+
+### 8. Statutory Tax Rates, RBAC & Forensic Audit Trail
+> **Statutory Tax & VAT Rates Configuration**  
+> Configurable tax slabs (Standard VAT, Reduced Rate, Zero Rated) with automated output tax calculation.
+
+![21 - Tax Management](screenshots/21_tax_management.png)
+
+> **User Management & Staff Directory**  
+> System user administration, role assignment, and access control.
+
+![22 - User Management](screenshots/22_user_management.png)
+
+> **Spatie Role-Based Access Control (RBAC)**  
+> Granular permission matrix configured for Admin, Accountant, Cashier, and Store Keeper roles.
+
+![23 - Roles & Permissions](screenshots/23_roles_permissions.png)
+
+> **Enterprise Forensic Audit Trail**  
+> Comprehensive audit log capturing exact before/after state diff JSON snapshots, actor credentials, client IP addresses, and operational timestamps.
+
+![24 - Audit Trail](screenshots/24_audit_trail.png)
+
+---
+
 ## 🛠️ Feature Modules
 
 ### 1. Interactive POS Terminal & Checkout
