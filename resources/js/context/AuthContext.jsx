@@ -40,9 +40,14 @@ export const AuthProvider = ({ children }) => {
     fetchDemoUsers();
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, captchaKey, captchaAnswer) => {
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post('/auth/login', {
+        email,
+        password,
+        captcha_key: captchaKey,
+        captcha_answer: captchaAnswer,
+      });
       setUser(res.data.user);
       setRole(res.data.role);
       setPermissions(res.data.permissions || []);
@@ -53,9 +58,17 @@ export const AuthProvider = ({ children }) => {
         timer: 1500,
         showConfirmButton: false,
       });
-      return true;
+      return { success: true, data: res.data };
     } catch (err) {
-      return false;
+      const errData = err.response?.data || {};
+      return {
+        success: false,
+        message: errData.message || 'Login failed. Please check credentials and security captcha.',
+        rateLimited: err.response?.status === 429 || !!errData.rate_limited,
+        retryAfter: errData.retry_after || 60,
+        captchaError: !!errData.captcha_error,
+        attemptsLeft: errData.attempts_left,
+      };
     }
   };
 
