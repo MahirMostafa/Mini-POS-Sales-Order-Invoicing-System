@@ -230,7 +230,7 @@ app/
 
 ## 👨‍💻 Author & Credits
 
-Developed with ❤️ by **Mahir Mostafa**  
+Developed by **Mahir Mostafa**  
 LinkedIn: [https://www.linkedin.com/in/mahirmostafa/](https://www.linkedin.com/in/mahirmostafa/)
 
 ---
