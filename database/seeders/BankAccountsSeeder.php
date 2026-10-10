@@ -18,7 +18,7 @@ class BankAccountsSeeder extends Seeder
         $banks = [
             [
                 'bank_name' => 'Dutch Bangla Bank Ltd (DBBL)',
-                'account_name' => 'Alo IT Main Operating Account',
+                'account_name' => 'Corporate Operating Account',
                 'account_number' => '110.120.456789',
                 'branch_name' => 'Gulshan Corporate Branch',
                 'routing_number' => '090271638',
@@ -29,7 +29,7 @@ class BankAccountsSeeder extends Seeder
             ],
             [
                 'bank_name' => 'The City Bank Ltd',
-                'account_name' => 'Alo IT Reserve Account',
+                'account_name' => 'Reserve & Vendor Settlement Account',
                 'account_number' => '210.330.789012',
                 'branch_name' => 'Dhanmondi Branch',
                 'routing_number' => '225271890',
@@ -40,7 +40,7 @@ class BankAccountsSeeder extends Seeder
             ],
             [
                 'bank_name' => 'bKash Merchant Digital Wallet',
-                'account_name' => 'Alo IT POS bKash QR',
+                'account_name' => 'POS Digital Merchant QR',
                 'account_number' => '01711002233',
                 'branch_name' => 'Digital Merchant Platform',
                 'routing_number' => 'BKASH01',

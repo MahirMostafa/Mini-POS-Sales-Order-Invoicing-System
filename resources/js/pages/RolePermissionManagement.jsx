@@ -173,13 +173,30 @@ export default function RolePermissionManagement() {
     'receive-purchases': { title: 'Receive & Stock Purchases', desc: 'Can confirm physical arrival of goods, update stock inventory and sign Goods Received Notes (GRN)' },
     'manage-tax-rates': { title: 'Manage VAT & Tax Rates', desc: 'Can create and configure dynamic tax rates and default tax rule' },
     
-    // Granular Dashboard Section Permissions
-    'view-accounting-dashboard': { title: 'View Accounting Dashboard', desc: 'Can open the Accounting & Financials module' },
-    'view-dashboard-financials': { title: 'Dashboard: Financial Summary Cards', desc: 'Can view Total Sales Revenue, Net Profit, VAT Collected, and Receivables KPIs' },
-    'view-dashboard-stock-info': { title: 'Dashboard: Stock Valuation & Pricing', desc: 'Can view Total Stock Cost Value, Expected Sales Value, and Potential Margin on Dashboard' },
-    'view-dashboard-customer-info': { title: 'Dashboard: Customer Receivables / Dues', desc: 'Can view Customer Credit / Due balance cards and customer summary on Dashboard' },
-    'view-dashboard-orders-info': { title: 'Dashboard: Sales & Order Analytics', desc: 'Can view Completed Orders, AOV, and Sales Volume metrics on Dashboard' },
-    'view-dashboard-recent-journals': { title: 'Dashboard: Recent Journal Stream', desc: 'Can view real-time feed of latest double-entry journal vouchers on Dashboard' },
+    // Granular Dashboard: Global Cards
+    'view-dashboard': { title: 'Access Executive Dashboard', desc: 'Can access and open the primary Executive Analytics & Insights Landing Page' },
+    'view-dashboard-gross-revenue': { title: 'Card: Gross Operating Revenue', desc: 'Can view Global Recognized Gross Operating Revenue (4010)' },
+    'view-dashboard-total-orders': { title: 'Card: Completed Orders Volume', desc: 'Can view Global Completed Orders and Pending Count' },
+    'view-dashboard-aov': { title: 'Card: Average Order Value (AOV)', desc: 'Can view Global Average Order Value metrics' },
+    'view-dashboard-vat-collected': { title: 'Card: Output VAT Collected', desc: 'Can view Global Output VAT & Tax Collected' },
+    'view-dashboard-cash-in-hand': { title: 'Card: Cash in Hand (1010)', desc: 'Can view Cash drawer and till closing balance' },
+    'view-dashboard-bank-balance': { title: 'Card: Bank Accounts (1020)', desc: 'Can view Total Corporate Bank balances & breakdown' },
+    'view-dashboard-liabilities': { title: 'Card: Current Liabilities', desc: 'Can view Tax Payable and Accounts Payable (AP) dues' },
+    'view-dashboard-expenses': { title: 'Card: Operating Expenses & COGS', desc: 'Can view COGS (5010) and Operating Expenses (5020)' },
+    'view-dashboard-net-profit': { title: 'Card: Net Operating Profit', desc: 'Can view Bottom-line Operating Profit & Margin %' },
+    'view-dashboard-revenue-chart': { title: 'Widget: Daily Sales Trend Chart', desc: 'Can view 7-Day and 30-Day Revenue Trend Bar/Area chart' },
+    'view-dashboard-tender-chart': { title: 'Widget: Tender & Payment Channels', desc: 'Can view Global Payment Tender breakdown (Cash, Card, Digital)' },
+    'view-dashboard-customers': { title: 'Card: Customer Receivables & CRM', desc: 'Can view Total Customers, Active Dues (1050) & Top Customers' },
+    'view-dashboard-products': { title: 'Card: Product Stock & Inventory Valuation', desc: 'Can view Products count, Units in stock & Inventory Valuation' },
+    'view-dashboard-cashier-leaderboard': { title: 'Card: Cashier Sales Leaderboard', desc: 'Can view Staff & Cashier rankings and sales performance' },
+    'view-dashboard-recent-orders': { title: 'Widget: Live Recent Orders Feed', desc: 'Can view Real-time Stream of Latest Orders' },
+
+    // Granular Dashboard: User-Specific / My Shift Cards
+    'view-dashboard-my-sales': { title: 'My Shift: My Gross Sales & Revenue', desc: 'Can view sales revenue generated specifically by logged-in cashier/user' },
+    'view-dashboard-my-orders': { title: 'My Shift: My Orders (Completed/Pending)', desc: 'Can view order counts processed by logged-in user' },
+    'view-dashboard-my-vat': { title: 'My Shift: My VAT Collected', desc: 'Can view Output VAT collected on logged-in user orders' },
+    'view-dashboard-my-tender': { title: 'My Shift: My Tender & Payment Channels', desc: 'Can view cash/card/digital tenders collected by logged-in user' },
+    'view-dashboard-my-aov': { title: 'My Shift: My Average Order Value', desc: 'Can view average order value for logged-in user orders' },
 
     // Cash in Hand Permissions
     'view-cash-book': { title: 'View Cash in Hand / Book', desc: 'Can inspect Cash in Hand debit/credit receipts, payments and closing cash balances' },
@@ -223,8 +240,11 @@ export default function RolePermissionManagement() {
 
   // Group permissions logically
   const getPermissionGroup = (name) => {
-    if (name.startsWith('view-dashboard-')) {
-      return 'Dashboard Section Permissions';
+    if (name.startsWith('view-dashboard-my-')) {
+      return 'Executive Dashboard: My Shift / Personal Telemetry';
+    }
+    if (name === 'view-dashboard' || name.startsWith('view-dashboard-')) {
+      return 'Executive Dashboard: Global Business Cards';
     }
     if (name.includes('cash-book') || name.includes('cash-money')) {
       return 'Cash in Hand & Drawer Flow';

@@ -112,7 +112,7 @@ export default function BankManagement() {
         setSummary(banksRes.data.summary || { total_bank_balance: 0, total_banks_count: 0, active_banks_count: 0 });
       }
       if (coaRes.data.success) {
-        setChartOfAccounts(coaRes.data.chart_of_accounts || []);
+        setChartOfAccounts(coaRes.data.accounts || coaRes.data.chart_of_accounts || []);
       }
     } catch (err) {
       console.error(err);
@@ -737,7 +737,7 @@ export default function BankManagement() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Alo IT Consulting Ltd."
+                  placeholder="e.g. Retail POS Operating Account"
                   value={bankForm.account_name}
                   onChange={(e) => setBankForm({ ...bankForm, account_name: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -922,7 +922,7 @@ export default function BankManagement() {
                     <option value="">-- Choose Account --</option>
                     {chartOfAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.code} - {a.name} ({a.type})
+                        {a.code || a.account_code} - {a.name || a.account_name} ({a.type || a.account_type})
                       </option>
                     ))}
                   </select>
@@ -1092,10 +1092,10 @@ export default function BankManagement() {
                   >
                     <option value="">-- Choose Account (Default: 5020 Operating Expense) --</option>
                     {chartOfAccounts
-                      .filter((a) => a.type === 'expense' || withdrawForm.destination_type === 'custom')
+                      .filter((a) => (a.type || a.account_type || '').toLowerCase() === 'expense' || withdrawForm.destination_type === 'custom')
                       .map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.code} - {a.name} ({a.type})
+                          {a.code || a.account_code} - {a.name || a.account_name} ({a.type || a.account_type})
                         </option>
                       ))}
                   </select>

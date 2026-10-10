@@ -15,6 +15,31 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Create All Granular Atomic Permissions
         $permissions = [
+            // Dashboard: Core Landing & Global Enterprise Cards
+            'view-dashboard',
+            'view-dashboard-gross-revenue',
+            'view-dashboard-total-orders',
+            'view-dashboard-aov',
+            'view-dashboard-vat-collected',
+            'view-dashboard-cash-in-hand',
+            'view-dashboard-bank-balance',
+            'view-dashboard-liabilities',
+            'view-dashboard-expenses',
+            'view-dashboard-net-profit',
+            'view-dashboard-revenue-chart',
+            'view-dashboard-tender-chart',
+            'view-dashboard-customers',
+            'view-dashboard-products',
+            'view-dashboard-cashier-leaderboard',
+            'view-dashboard-recent-orders',
+
+            // Dashboard: User-Specific / My Shift Telemetry Cards
+            'view-dashboard-my-sales',
+            'view-dashboard-my-orders',
+            'view-dashboard-my-vat',
+            'view-dashboard-my-tender',
+            'view-dashboard-my-aov',
+
             // POS & Sales
             'view-pos',
             'create-order',
@@ -44,14 +69,6 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // Tax Rates
             'manage-tax-rates',
-
-            // Granular Dashboard Section Permissions
-            'view-accounting-dashboard',
-            'view-dashboard-financials',
-            'view-dashboard-stock-info',
-            'view-dashboard-customer-info',
-            'view-dashboard-orders-info',
-            'view-dashboard-recent-journals',
 
             // Cash in Hand Permissions
             'view-cash-book',
@@ -93,6 +110,23 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage-settings',
         ];
 
+        // Clean up legacy, phantom, and redundant permissions if they exist
+        $legacyPerms = [
+            'view-accounting-dashboard',
+            'view-dashboard-stock-info',
+            'view-dashboard-customer-info',
+            'view-dashboard-orders-info',
+            'view-dashboard-recent-journals',
+            'view-dashboard-purchases',
+            'view-dashboard-low-stock',
+            'view-dashboard-sales',
+            'view-dashboard-financials',
+            'view-dashboard-charts',
+            'view-dashboard-sales-by-user',
+        ];
+        Permission::whereIn('name', $legacyPerms)->delete();
+
+        // Ensure all valid permissions exist in database
         foreach ($permissions as $perm) {
             Permission::firstOrCreate(['name' => $perm, 'guard_name' => 'web']);
         }
@@ -101,9 +135,15 @@ class RolesAndPermissionsSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
         $adminRole->syncPermissions(Permission::all());
 
-        // 2. Cashier Role (POS, Orders, Invoices, Customer View/Create/Edit, Customer & Order Dashboard cards, Cash in Hand & Bank views)
+        // 2. Cashier Role
         $cashierRole = Role::firstOrCreate(['name' => 'Cashier', 'guard_name' => 'web']);
         $cashierRole->syncPermissions([
+            'view-dashboard',
+            'view-dashboard-my-sales',
+            'view-dashboard-my-orders',
+            'view-dashboard-my-vat',
+            'view-dashboard-my-tender',
+            'view-dashboard-my-aov',
             'view-pos',
             'create-order',
             'complete-order',
@@ -114,26 +154,34 @@ class RolesAndPermissionsSeeder extends Seeder
             'create-customers',
             'edit-customers',
             'manage-customers',
-            'view-dashboard-orders-info',
-            'view-dashboard-customer-info',
             'view-cash-book',
             'add-cash-money',
             'view-banks',
             'deposit-banks',
         ]);
 
-        // 3. Accountant Role (Full Financials, Cash Book, Bank Book, Day Book, Trial Balance, Balance Sheet, P&L, Ledger, Taxes, Bank Management)
+        // 3. Accountant Role
         $accountantRole = Role::firstOrCreate(['name' => 'Accountant', 'guard_name' => 'web']);
         $accountantRole->syncPermissions([
+            'view-dashboard',
+            'view-dashboard-gross-revenue',
+            'view-dashboard-total-orders',
+            'view-dashboard-aov',
+            'view-dashboard-vat-collected',
+            'view-dashboard-cash-in-hand',
+            'view-dashboard-bank-balance',
+            'view-dashboard-liabilities',
+            'view-dashboard-expenses',
+            'view-dashboard-net-profit',
+            'view-dashboard-revenue-chart',
+            'view-dashboard-tender-chart',
+            'view-dashboard-customers',
+            'view-dashboard-products',
+            'view-dashboard-cashier-leaderboard',
+            'view-dashboard-recent-orders',
             'view-invoices',
             'print-invoices',
             'view-customers',
-            'view-accounting-dashboard',
-            'view-dashboard-financials',
-            'view-dashboard-stock-info',
-            'view-dashboard-customer-info',
-            'view-dashboard-orders-info',
-            'view-dashboard-recent-journals',
             'view-cash-book',
             'add-cash-money',
             'withdraw-cash-money',
@@ -162,6 +210,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage-tax-rates',
             'view-audit-logs',
             'manage-purchases',
+        ]);
+
+        // 4. Store Keeper Role (Specifically restricted to receiving purchased goods)
+        $storeKeeperRole = Role::firstOrCreate(['name' => 'Store Keeper', 'guard_name' => 'web']);
+        $storeKeeperRole->syncPermissions([
+            'view-dashboard',
+            'receive-purchases',
         ]);
     }
 }
